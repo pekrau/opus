@@ -10,6 +10,7 @@ import reportlab.lib.colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     Paragraph,
+    Spacer,
     NotAtTopPageBreak,
     SimpleDocTemplate,
     LayoutError,
@@ -30,6 +31,7 @@ class Document:
         language="sv-SE",
         page_break_level=1,
         section_numbers=True,
+        paragraph_numbers=True,
     ):
         self.title = title
         self.authors = authors
@@ -37,6 +39,7 @@ class Document:
         self.language = language
         self.page_break_level = page_break_level
         self.section_numbers = section_numbers
+        self.paragraph_numbers = paragraph_numbers
 
         self.stylesheet = getSampleStyleSheet()
         # self.stylesheet.list()
@@ -59,6 +62,7 @@ class Document:
         self.stylesheet["OrderedList"].fontName = PDF_NORMAL_FONT
         self.stylesheet["OrderedList"].fontSize = PDF_NORMAL_FONT_SIZE
         self.stylesheet["OrderedList"].bulletFormat = "%s. "
+
         self.stylesheet["UnorderedList"].fontName = PDF_NORMAL_FONT
         self.stylesheet["UnorderedList"].fontSize = PDF_NORMAL_FONT_SIZE
         self.stylesheet["UnorderedList"].bulletType = "bullet"
@@ -78,6 +82,7 @@ class Document:
                 fontSize=PDF_QUOTE_FONT_SIZE,
                 leading=PDF_QUOTE_LEADING,
                 spaceBefore=PDF_QUOTE_SPACE_BEFORE,
+                spaceAfter=PDF_QUOTE_SPACE_AFTER,
                 leftIndent=PDF_QUOTE_INDENT,
                 rightIndent=PDF_QUOTE_INDENT,
             )
@@ -111,7 +116,13 @@ class Document:
         self.stylesheet["Normal"].spaceBefore = PDF_NORMAL_SPACE_BEFORE
         self.stylesheet["Normal"].spaceAfter = PDF_NORMAL_SPACE_AFTER
 
+        self.paragraph = None
+        self.paragraphs_count = 0
+        self.section_counts = [0]
+        self.index = SimpleIndex(style=self.stylesheet["Index"], headers=False)
+        self.any_indexed = False
         self.flowables = []
+
         if self.title:
             self.flowables.append(Paragraph(self.title, style=self.stylesheet["Title"]))
         if self.authors:
@@ -122,28 +133,32 @@ class Document:
             self.flowables.append(
                 Paragraph(self.version, style=self.stylesheet["Normal"])
             )
-
-        self.list_stack = []
-        self.index = SimpleIndex(style=self.stylesheet["Index"], headers=False)
-        self.any_indexed = False
-        self.section_counts = [0]
+        self.flowables.append(Spacer(0, PDF_TITLE_PAGE_SPACER))
 
     def new_paragraph(self):
-        try:
-            paragraph = self.paragraph
-        except AttributeError:
-            pass
-        else:
-            paragraph.flush()
+        if self.paragraph:
+            self.paragraph.output()
+        self.paragraphs_count += 1
         self.paragraph = _Paragraph(self)
         return self.paragraph
 
+    def new_quote(self):
+        if self.paragraph:
+            self.paragraph.output()
+        self.paragraphs_count += 1
+        self.paragraph = _Quote(self)
+        return self.paragraph
+
     def new_section(self, title):
-        self.new_paragraph()
+        if self.paragraph:
+            self.paragraph.output()
+            self.paragraph = None
         return _Section(self, title)
 
     def new_page(self):
-        self.new_paragraph()
+        if self.paragraph:
+            self.paragraph.output()
+            self.paragraph = None
         self.flowables.append(NotAtTopPageBreak())
 
     def display_page_number(self, canvas, pdfdoc):
@@ -164,20 +179,52 @@ class Document:
             creator=f"opus {VERSION}",
             lang=self.language,
         )
-        pdfdoc.build(self.flowables, onLaterPages=self.display_page_number)
+        if self.any_indexed:
+            self.new_page()
+            self.flowables.append(Paragraph("Index", style=self.stylesheet["Heading1"]))
+            self.flowables.append(self.index)
+            pdfdoc.build(
+                self.flowables,
+                onLaterPages=self.display_page_number,
+                canvasmaker=self.index.getCanvasMaker(),
+            )
+        else:
+            pdfdoc.build(self.flowables, onLaterPages=self.display_page_number)
         with open(filepath, "wb") as outfile:
             outfile.write(output.getvalue())
 
 
 class _Paragraph:
 
+    STYLESHEETNAME = "Normal"
+
     def __init__(self, document):
         self.document = document
         self.contents = []
 
-    def add(self, text):
+    def add(self, text, append_blank=True):
         assert isinstance(text, str)
         self.contents.append(text)
+        if append_blank and text[-1] != " ":
+            self.contents.append(" ")
+
+    def linebreak(self):
+        self.contents.append("<br/>")
+
+    def add_indexed(self, text, canonical=None, append_blank=True):
+        if canonical:
+            canonical = canonical.replace(",", ",,")
+        with self.underline():
+            self.add(f'<index item="{canonical or text}">{text}</index>', append_blank=append_blank)
+        self.document.any_indexed = True
+
+    def add_link(self, text, href, append_blank=True):
+        assert isinstance(text, str)
+        self.contents.append(
+            f'<link href="{href}" underline="true" color="blue">{text}</link>'
+        )
+        if append_blank:
+            self.contents.append(" ")
 
     @contextmanager
     def bold(self):
@@ -203,18 +250,22 @@ class _Paragraph:
         finally:
             self.contents.append("</u>")
 
-    def add_link(self, text, href):
-        assert isinstance(text, str)
-        self.contents.append(
-            f'<link href="{href}" underline="true" color="blue">{text}</link>'
-        )
-
-    def flush(self):
+    def output(self):
         if not self.contents:
             return
+        if self.document.paragraph_numbers:
+            self.contents.insert(0, f"<b>{self.document.paragraphs_count}.</b> ")
         self.document.flowables.append(
-            Paragraph("".join(self.contents), style=self.document.stylesheet["Normal"])
+            Paragraph(
+                "".join(self.contents),
+                style=self.document.stylesheet[self.STYLESHEETNAME],
+            )
         )
+
+
+class _Quote(_Paragraph):
+
+    STYLESHEETNAME = "Quote"
 
 
 class _Section:
