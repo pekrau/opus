@@ -29,7 +29,7 @@ class TocDocTemplate(SimpleDocTemplate):
 
     def afterFlowable(self, flowable):
         "Registers TOC entries."
-        if flowable.__class__.__name__ != 'Paragraph':
+        if flowable.__class__.__name__ != "Paragraph":
             return
         stylename = flowable.style.name
         if not stylename.startswith("Heading"):
@@ -37,7 +37,7 @@ class TocDocTemplate(SimpleDocTemplate):
         text = flowable.getPlainText()
         for level in range(1, self.toc_level + 1):
             if stylename == f"Heading{level}":
-                self.notify('TOCEntry', (level, text, self.page))
+                self.notify("TOCEntry", (level, text, self.page))
                 break
 
 

@@ -89,11 +89,11 @@ if __name__ == "__main__":
     kwargs = dict(
         title="Testing opus",
         authors=["Per Kraulis"],
-        version="version 1",
+        version=f"version {opus.__version__}",
         page_break_level=1,
-        section_numbers=False,
-        paragraph_numbers=False,
-        toc_level=1,
+        section_numbers=True,
+        paragraph_numbers=True,
+        toc_level=2,
     )
 
     document = opus.get_document("docx", **kwargs)
