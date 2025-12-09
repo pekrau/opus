@@ -21,8 +21,11 @@ class Document:
         version=None,
         language="sv-SE",
         page_break_level=1,
-        section_numbers=True,
-        paragraph_numbers=True,
+        section_numbers=False,
+        paragraph_numbers=False,
+        toc_level=0,
+        toc_title="Innehåll",
+        index_title="Index",
     ):
         self.title = title
         self.authors = authors
@@ -31,6 +34,9 @@ class Document:
         self.page_break_level = page_break_level
         self.section_numbers = section_numbers
         self.paragraph_numbers = paragraph_numbers
+        self.toc_level = toc_level
+        self.toc_title = toc_title
+        self.index_title = index_title
 
         self.paragraphs_count = 0
         self.sections_counts = [0]
@@ -38,6 +44,7 @@ class Document:
         self.page_number = 1
 
         self.docx = self.get_docx()
+        self.toc_docx = None
         p = None
         if self.title:
             p = self.docx.add_heading(self.title, 0)
@@ -47,6 +54,20 @@ class Document:
             p = self.docx.add_paragraph(self.version)
         if p:
             p.paragraph_format.space_after = docx.shared.Pt(DOCX_TITLE_PAGE_SPACER)
+
+    def init_toc(self):
+        if not self.toc_level:
+            return
+        if self.toc_docx:
+            return
+        self.toc_docx = self.docx
+        self.toc_docx.add_page_break()
+        self.toc_docx.add_heading(self.toc_title, level=1)
+        self.toc_paragraph = self.toc_docx.add_paragraph(style="Normal")
+        self.toc_paragraph.paragraph_format.tab_stops.add_tab_stop(
+            docx.shared.Mm(160), docx.enum.text.WD_TAB_ALIGNMENT.RIGHT
+        )
+        self.docx = self.get_docx()
 
     def get_docx(self):
         "Create, initialize and return a docx Document instance."
@@ -76,7 +97,9 @@ class Document:
 
         for level in range(1, MAX_LEVEL + 1):
             style = result.styles[f"Heading {level}"]
-            style.paragraph_format.space_before = docx.shared.Pt(DOCX_HEADER_SPACE_BEFORE)
+            style.paragraph_format.space_before = docx.shared.Pt(
+                DOCX_HEADER_SPACE_BEFORE
+            )
             style.paragraph_format.space_after = docx.shared.Pt(DOCX_HEADER_SPACE_AFTER)
             style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
@@ -85,11 +108,11 @@ class Document:
         style.font.size = docx.shared.Pt(DOCX_NORMAL_FONT_SIZE)
         style.paragraph_format.line_spacing = docx.shared.Pt(DOCX_NORMAL_LINE_SPACING)
 
-        # "Body Text": TOC entries and index pages.
-        style = result.styles["Body Text"]
-        style.font.name = DOCX_NORMAL_FONT
-        style.paragraph_format.space_before = docx.shared.Pt(DOCX_TOC_SPACE_BEFORE)
-        style.paragraph_format.space_after = docx.shared.Pt(DOCX_TOC_SPACE_AFTER)
+        # # "Body Text": TOC entries and index pages.
+        # style = result.styles["Body Text"]
+        # style.font.name = DOCX_NORMAL_FONT
+        # style.paragraph_format.space_before = docx.shared.Pt(DOCX_TOC_SPACE_BEFORE)
+        # style.paragraph_format.space_after = docx.shared.Pt(DOCX_TOC_SPACE_AFTER)
 
         # "Quote": quote blocks.
         style = result.styles["Quote"]
@@ -158,7 +181,22 @@ class Document:
         self.page_number = number
 
     def write(self, filepath):
-        self.docx.save(filepath)
+        if self.indexed:
+            self.section_numbers = False
+            self.paragraph_numbers = False
+            with self.new_section(self.index_title):
+                p = self.new_paragraph()
+                for canonical, page_numbers in self.indexed.items():
+                    numbers = ", ".join([str(n) for n in sorted(page_numbers)])
+                    p.add(f"{canonical},\t{numbers}")
+                    p.linebreak()
+        if self.toc_level:
+            for element in self.docx.element.body:
+                self.toc_docx.element.body.append(element)
+            docx = self.toc_docx
+        else:
+            docx = self.docx
+        docx.save(filepath)
 
 
 class _Paragraph:
@@ -189,7 +227,9 @@ class _Paragraph:
     def add_indexed(self, text, canonical=None, append_blank=True):
         with self.underline():
             self.add(text, append_blank=append_blank)
-        self.document.indexed[canonical or text] = (text, self.document.paragraphs_count)
+        self.document.indexed.setdefault(canonical or text, set()).add(
+            self.document.page_number
+        )
 
     def add_link(self, text, href, append_blank=True):
         assert isinstance(text, str)
@@ -255,6 +295,7 @@ class _Section:
 
     def __init__(self, document, title):
         self.document = document
+        self.document.init_toc()
         self.title = title
         self.document.sections_counts[-1] += 1
 
@@ -274,6 +315,11 @@ class _Section:
             title.append(self.title)
         title = " ".join(title)
         self.document.docx.add_heading(title, level=level)
+        if level <= self.document.toc_level:
+            indent = "      " * (level - 1)
+            self.document.toc_paragraph.add_run(
+                f"{indent}{title}\t{self.document.page_number}\n"
+            )
         return self
 
     def __exit__(self, *exc):

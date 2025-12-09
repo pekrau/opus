@@ -11,6 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     Paragraph,
     Spacer,
+    PageBreak,
     NotAtTopPageBreak,
     SimpleDocTemplate,
     LayoutError,
@@ -18,6 +19,26 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
 
 from .constants import *
+
+
+class TocDocTemplate(SimpleDocTemplate):
+
+    def __init__(self, filename, toc_level, **kwargs):
+        super().__init__(filename, **kwargs)
+        self.toc_level = toc_level
+
+    def afterFlowable(self, flowable):
+        "Registers TOC entries."
+        if flowable.__class__.__name__ != 'Paragraph':
+            return
+        stylename = flowable.style.name
+        if not stylename.startswith("Heading"):
+            return
+        text = flowable.getPlainText()
+        for level in range(1, self.toc_level + 1):
+            if stylename == f"Heading{level}":
+                self.notify('TOCEntry', (level, text, self.page))
+                break
 
 
 class Document:
@@ -30,8 +51,11 @@ class Document:
         version=None,
         language="sv-SE",
         page_break_level=1,
-        section_numbers=True,
-        paragraph_numbers=True,
+        section_numbers=False,
+        paragraph_numbers=False,
+        toc_level=0,
+        toc_title="Innehåll",
+        index_title="Index",
     ):
         self.title = title
         self.authors = authors
@@ -40,6 +64,9 @@ class Document:
         self.page_break_level = page_break_level
         self.section_numbers = section_numbers
         self.paragraph_numbers = paragraph_numbers
+        self.toc_level = toc_level
+        self.toc_title = toc_title
+        self.index_title = index_title
 
         self.stylesheet = getSampleStyleSheet()
         # self.stylesheet.list()
@@ -68,6 +95,24 @@ class Document:
         self.stylesheet["UnorderedList"].bulletType = "bullet"
         self.stylesheet["UnorderedList"].bulletFont = PDF_NORMAL_FONT_SIZE
 
+        self.stylesheet.add(
+            ParagraphStyle(
+                name="Subtitle",
+                parent=self.stylesheet["Heading1"],
+            )
+        )
+        self.stylesheet.add(
+            ParagraphStyle(
+                name="Authors",
+                parent=self.stylesheet["Heading2"],
+            )
+        )
+        self.stylesheet.add(
+            ParagraphStyle(
+                name="Contents",
+                parent=self.stylesheet["Heading1"],
+            )
+        )
         self.stylesheet.add(
             ParagraphStyle(
                 name="Index",
@@ -122,18 +167,47 @@ class Document:
         self.index = SimpleIndex(style=self.stylesheet["Index"], headers=False)
         self.any_indexed = False
         self.flowables = []
+        self.toc = None
 
         if self.title:
             self.flowables.append(Paragraph(self.title, style=self.stylesheet["Title"]))
         if self.authors:
             self.flowables.append(
-                Paragraph(", ".join(self.authors), style=self.stylesheet["Heading2"])
+                Paragraph(", ".join(self.authors), style=self.stylesheet["Authors"])
             )
         if self.version:
             self.flowables.append(
                 Paragraph(self.version, style=self.stylesheet["Normal"])
             )
         self.flowables.append(Spacer(0, PDF_TITLE_PAGE_SPACER))
+
+    def setup_toc(self):
+        if not self.toc_level:
+            return
+        if self.toc is not None:
+            return
+        if self.paragraph:
+            self.paragraph.output()
+        self.flowables.append(PageBreak())
+        self.flowables.append(
+            Paragraph(self.toc_title, style=self.stylesheet["Contents"])
+        )
+        level_styles = []
+        for level in range(0, self.toc_level + 1):
+            style = ParagraphStyle(
+                name=f"TOC level {level}",
+                fontName=PDF_NORMAL_FONT,
+                fontSize=PDF_NORMAL_FONT_SIZE,
+                leftIndent=20 * (level - 1),
+                rightIndent=30,
+                firstLineIndent=0,
+            )
+            level_styles.append(style)
+        self.toc = TableOfContents(
+            dotsMinLevel=-1,
+            levelStyles=level_styles,
+        )
+        self.flowables.append(self.toc)
 
     def new_paragraph(self):
         if self.paragraph:
@@ -150,6 +224,7 @@ class Document:
         return self.paragraph
 
     def new_section(self, title):
+        self.setup_toc()
         if self.paragraph:
             self.paragraph.output()
             self.paragraph = None
@@ -161,37 +236,56 @@ class Document:
             self.paragraph = None
         self.flowables.append(NotAtTopPageBreak())
 
-    def display_page_number(self, canvas, pdfdoc):
+    def set_page_number(self, number):
+        "Not needed for PDF."
+        pass
+
+    def write(self, filepath):
+        self.new_paragraph()
+        output = io.BytesIO()
+        kwargs = dict(
+            title=self.title,
+            author=", ".join(self.authors) or None,
+            creator=f"opus {VERSION}",
+            lang=self.language,
+        )
+        if self.toc_level:
+            pdfdoc = TocDocTemplate(output, self.toc_level, **kwargs)
+        else:
+            pdfdoc = SimpleDocTemplate(output, **kwargs)
+        if self.any_indexed:
+            self.new_page()
+            self.flowables.append(
+                Paragraph(self.index_title, style=self.stylesheet["Heading1"])
+            )
+            self.flowables.append(self.index)
+            if self.toc_level:
+                pdfdoc.multiBuild(
+                    self.flowables,
+                    onLaterPages=self._write_page_number,
+                    canvasmaker=self.index.getCanvasMaker(),
+                )
+            else:
+                pdfdoc.build(
+                    self.flowables,
+                    onLaterPages=self._write_page_number,
+                    canvasmaker=self.index.getCanvasMaker(),
+                )
+        else:
+            if self.toc_level:
+                pdfdoc.multiBuild(self.flowables, onLaterPages=self.display_page_number)
+            else:
+                pdfdoc.build(self.flowables, onLaterPages=self.display_page_number)
+        with open(filepath, "wb") as outfile:
+            outfile.write(output.getvalue())
+
+    def _write_page_number(self, canvas, pdfdoc):
         "Output page number onto the current canvas."
         width, height = reportlab.rl_config.defaultPageSize
         canvas.saveState()
         canvas.setFont(PDF_NORMAL_FONT, PDF_NORMAL_FONT_SIZE)
         canvas.drawString(width - 84, height - 56, str(pdfdoc.page))
         canvas.restoreState()
-
-    def write(self, filepath):
-        self.new_paragraph()
-        output = io.BytesIO()
-        pdfdoc = SimpleDocTemplate(
-            output,
-            title=self.title,
-            author=", ".join(self.authors) or None,
-            creator=f"opus {VERSION}",
-            lang=self.language,
-        )
-        if self.any_indexed:
-            self.new_page()
-            self.flowables.append(Paragraph("Index", style=self.stylesheet["Heading1"]))
-            self.flowables.append(self.index)
-            pdfdoc.build(
-                self.flowables,
-                onLaterPages=self.display_page_number,
-                canvasmaker=self.index.getCanvasMaker(),
-            )
-        else:
-            pdfdoc.build(self.flowables, onLaterPages=self.display_page_number)
-        with open(filepath, "wb") as outfile:
-            outfile.write(output.getvalue())
 
 
 class _Paragraph:
@@ -215,7 +309,10 @@ class _Paragraph:
         if canonical:
             canonical = canonical.replace(",", ",,")
         with self.underline():
-            self.add(f'<index item="{canonical or text}">{text}</index>', append_blank=append_blank)
+            self.add(
+                f'<index item="{canonical or text}">{text}</index>',
+                append_blank=append_blank,
+            )
         self.document.any_indexed = True
 
     def add_link(self, text, href, append_blank=True):
@@ -261,6 +358,7 @@ class _Paragraph:
                 style=self.document.stylesheet[self.STYLESHEETNAME],
             )
         )
+        self.contents = []
 
 
 class _Quote(_Paragraph):

@@ -1,4 +1,4 @@
-"Test of opus."
+"Test of opus, showing usage of current features."
 
 
 def add(doc):
@@ -32,7 +32,14 @@ def add(doc):
         p.add_link("Second link.", href="http://somewhere.com/")
 
     q = doc.new_quote()
-    q.add("This is a quote from a sage. More text. More text. More text. More text. More text. More text. More text. More text. More text. More text. More text.")
+    q.add(
+        """This is a quote from a sage.
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
+        do eiusmod tempor incididunt ut labore et dolore magna
+        aliqua. Ut enim ad minim veniam, quis nostrud exercitation
+        ullamco laboris nisi ut aliquip ex ea commodo consequat.
+        """
+    )
     q.linebreak()
     q.linebreak()
     q.add("The name of the")
@@ -42,11 +49,12 @@ def add(doc):
     p = doc.new_paragraph()
     p.add("And a sentence after the quote.")
 
+    doc.set_page_number(2)
     with doc.new_section("Title for top-level section"):
         p = doc.new_paragraph()
         p.add("First sentence in the top-level section.")
         p.add("Here is another mention of")
-        p.add_indexed("Sage",  canonical="Sage, Mr", append_blank=False)
+        p.add_indexed("Sage", canonical="Sage, Mr", append_blank=False)
         p.add(".")
         with doc.new_section("Second-level section"):
             p = doc.new_paragraph()
@@ -71,7 +79,7 @@ def add(doc):
             This should appear on a new page."""
         )
         p.add("Here is yet another mention of")
-        p.add_indexed("Sage",  canonical="Sage, Mr", append_blank=False)
+        p.add_indexed("Sage", canonical="Sage, Mr", append_blank=False)
         p.add(".")
 
 
@@ -82,6 +90,10 @@ if __name__ == "__main__":
         title="Testing opus",
         authors=["Per Kraulis"],
         version="version 1",
+        page_break_level=1,
+        section_numbers=False,
+        paragraph_numbers=False,
+        toc_level=1,
     )
 
     document = opus.get_document("docx", **kwargs)
