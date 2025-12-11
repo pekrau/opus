@@ -24,7 +24,7 @@ __all__ = ["Document", "VERSION"]
 
 NORMAL_FONT = "Helvetica"
 NORMAL_FONT_SIZE = 12
-NORMAL_LEADING = 17
+NORMAL_LEADING = 18
 NORMAL_SPACE_BEFORE = 6
 NORMAL_SPACE_AFTER = 6
 TITLE_FONT_SIZE = 24
@@ -99,12 +99,6 @@ class Document(BaseDocument):
         )
         self.stylesheet.add(
             ParagraphStyle(
-                name="Index",
-                parent=self.stylesheet["Normal"],
-            )
-        )
-        self.stylesheet.add(
-            ParagraphStyle(
                 name="Quote",
                 parent=self.stylesheet["Normal"],
                 fontName=QUOTE_FONT,
@@ -146,13 +140,15 @@ class Document(BaseDocument):
         self.stylesheet["Normal"].spaceAfter = NORMAL_SPACE_AFTER
 
         self.paragraph = None
-        self.index = SimpleIndex(style=self.stylesheet["Index"], headers=False)
+        self.index = SimpleIndex(style=self.stylesheet["Normal"], headers=False)
         self.any_indexed = False
         self.flowables = []
         self.toc = None
 
         if self.title:
-            self.flowables.append(PdfParagraph(self.title, style=self.stylesheet["Title"]))
+            self.flowables.append(
+                PdfParagraph(self.title, style=self.stylesheet["Title"])
+            )
         if self.authors:
             self.flowables.append(
                 PdfParagraph(", ".join(self.authors), style=self.stylesheet["Authors"])

@@ -17,7 +17,7 @@ HEADER_SPACE_AFTER = 6
 TOC_STYLE = "Normal Table"
 NORMAL_FONT = "Helvetica"
 NORMAL_FONT_SIZE = 12
-NORMAL_LINE_SPACING = 17
+NORMAL_LINE_SPACING = 18
 QUOTE_FONT = "Times New Roman"
 QUOTE_FONT_SIZE = 14
 QUOTE_INDENT = 24
@@ -58,7 +58,9 @@ class Document(BaseDocument):
         self.page_number += 1
         self.docx.add_page_break()
         self.docx.add_heading(self.toc_title, 1)
-        self.toc_table = self.docx.add_table(rows=0, cols=0, style=self.docx.styles[TOC_STYLE])
+        self.toc_table = self.docx.add_table(
+            rows=0, cols=0, style=self.docx.styles[TOC_STYLE]
+        )
         self.toc_table.add_column(docx.shared.Mm(140))
         self.toc_table.add_column(docx.shared.Mm(20))
 
@@ -85,23 +87,13 @@ class Document(BaseDocument):
         section.header_distance = docx.shared.Mm(12.7)  # 0.5 inch
         section.footer_distance = docx.shared.Mm(12.7)
 
-        # for cstyle in [
-        #     s
-        #     for s in result.styles
-        #     if isinstance(s, docx.styles.style.ParagraphStyle)
-        #     and not isinstance(s, docx.styles.style._TableStyle)
-        # ]:
-        #     print(cstyle, cstyle.name)
-
         # Modify styles.
         style = result.styles["Title"]
         style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
         for level in range(1, MAX_LEVEL + 1):
             style = result.styles[f"Heading {level}"]
-            style.paragraph_format.space_before = docx.shared.Pt(
-                HEADER_SPACE_BEFORE
-            )
+            style.paragraph_format.space_before = docx.shared.Pt(HEADER_SPACE_BEFORE)
             style.paragraph_format.space_after = docx.shared.Pt(HEADER_SPACE_AFTER)
             style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
@@ -110,22 +102,14 @@ class Document(BaseDocument):
         style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
         style.paragraph_format.line_spacing = docx.shared.Pt(NORMAL_LINE_SPACING)
 
-        # # "Body Text": TOC entries and index pages.
-        # style = result.styles["Body Text"]
-        # style.font.name = NORMAL_FONT
-        # style.paragraph_format.space_before = docx.shared.Pt(TOC_SPACE_BEFORE)
-        # style.paragraph_format.space_after = docx.shared.Pt(TOC_SPACE_AFTER)
-
-        # "Quote": quote blocks.
-        style = result.styles["Quote"]
+        style = result.styles["Quote"]  # Quote blocks.
         style.font.name = QUOTE_FONT
         style.font.size = docx.shared.Pt(QUOTE_FONT_SIZE)
         style.font.italic = False
         style.paragraph_format.left_indent = docx.shared.Pt(QUOTE_INDENT)
         style.paragraph_format.right_indent = docx.shared.Pt(QUOTE_INDENT)
 
-        # "macro": code blocks.
-        style = result.styles["macro"]
+        style = result.styles["macro"]  # Code blocks.
         style.font.name = CODE_FONT
         style.font.size = docx.shared.Pt(CODE_FONT_SIZE)
         style.paragraph_format.line_spacing = docx.shared.Pt(CODE_LINE_SPACING)
@@ -211,7 +195,9 @@ class Section(BaseSection):
             cells[0].text = title
             cells[0].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
             cells[0].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
-            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(3 * (level - 1))
+            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
+                3 * (level - 1)
+            )
             cells[1].text = str(self.document.page_number)
             cells[1].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
             cells[1].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
@@ -272,15 +258,20 @@ class Paragraph(BaseParagraph):
 
         # This gets access to the document.xml.rels file and gets a new relation id value
         part = self.paragraph.part
-        r_id = part.relate_to(href, docx.opc.constants.RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
+        r_id = part.relate_to(
+            href, docx.opc.constants.RELATIONSHIP_TYPE.HYPERLINK, is_external=True
+        )
 
         # Create the w:hyperlink tag and add needed values
-        hyperlink = docx.oxml.shared.OxmlElement('w:hyperlink')
-        hyperlink.set(docx.oxml.shared.qn('r:id'), r_id, )
+        hyperlink = docx.oxml.shared.OxmlElement("w:hyperlink")
+        hyperlink.set(
+            docx.oxml.shared.qn("r:id"),
+            r_id,
+        )
 
         # Create a w:r element and a new w:rPr element and join together
-        new_run = docx.oxml.shared.OxmlElement('w:r')
-        rPr = docx.oxml.shared.OxmlElement('w:rPr')
+        new_run = docx.oxml.shared.OxmlElement("w:r")
+        rPr = docx.oxml.shared.OxmlElement("w:rPr")
         new_run.append(rPr)
 
         # Style and add text to the w:r element

@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -83,9 +83,15 @@ class BaseDocument:
                     case "text":
                         p.add(item.text)
                     case "indexed":
-                        p.add_indexed(item.text, canonical=item.canonical, prepend_blank=item.prepend_blank)
+                        p.add_indexed(
+                            item.text,
+                            canonical=item.canonical,
+                            prepend_blank=item.prepend_blank,
+                        )
                     case "link":
-                        p.add_link(item.text, item.href, prepend_blank=item.prepend_blank)
+                        p.add_link(
+                            item.text, item.href, prepend_blank=item.prepend_blank
+                        )
                     case "reference":
                         p.add_reference(item.text)
         self.footnotes = []
@@ -208,10 +214,14 @@ class Footnote:
         self.items.append(FootnoteItem("text", text))
 
     def add_indexed(self, text, canonical=None, prepend_blank=True):
-        self.items.append(Footnote("indexed", text, canonical=canonical, prepend_blank=prepend_blank))
+        self.items.append(
+            Footnote("indexed", text, canonical=canonical, prepend_blank=prepend_blank)
+        )
 
     def add_link(self, text, href, prepend_blank=True):
-        self.items.append(FootnoteItem("link", text, href=href, prepend_blank=prepend_blank))
+        self.items.append(
+            FootnoteItem("link", text, href=href, prepend_blank=prepend_blank)
+        )
 
     def add_reference(self, name):
         self.items.append(FootnoteItem("reference", name))
