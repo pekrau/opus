@@ -1,6 +1,7 @@
 "Opus: Text defined in Python for output to different formats."
 
-from .constants import VERSION as __version__
+from .base_document import VERSION as __version__
+from .references import References
 
 
 def get_document(format, **kwargs):

@@ -2,13 +2,9 @@
 
 
 def add(doc):
-    p = doc.new_paragraph()
-    p.add("This is text in the first paragraph.")
-
-    p.add(
-        """This is the first sentence in the document.
-    Newlines in this text are handled as ordinary whitespace. """
-    )
+    p = doc("This is text in the first paragraph.")
+    p += """This is the second sentence in the document.
+    Newlines in this text are handled as ordinary whitespace."""
 
     p = doc.new_paragraph()
     p.add("First sentence in new paragraph.")

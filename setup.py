@@ -1,14 +1,17 @@
 from setuptools import setup
 
+import opus
+
 setup(
     name="opus",
-    version="0.1",
-    description="Text structured in Python for rendering into different formats.",
+    version=opus.__version__,
+    description="Text defined in Python for output to different formats.",
     author="Per Kraulis",
     author_email="per.kraulis@gmail.com",
     license="MIT",
     install_requires=[
         "python-docx",
         "reportlab",
+        "pyyaml",
     ],
 )
