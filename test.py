@@ -2,7 +2,7 @@
 
 
 def add(doc):
-    p = doc("This is text in the first paragraph.")
+    p = doc.p("This is text in the first paragraph.")
     p += """This is the second sentence in the document.
     Newlines in this text are handled as ordinary whitespace."""
 
@@ -19,13 +19,13 @@ def add(doc):
             p.add("Underlined and italic.")
     p.add(" Normal again. ")
 
-    p.add_link("First link.", href="http://somewhere.com/")
+    p.add_link("http://somewhere.com/", "First link.")
     p.add(" Ordinary text.")
 
     p = doc.new_paragraph()
     p.add("First sentence in a new paragraph.")
     with p.italic():
-        p.add_link("Second link.", href="http://somewhere.com/")
+        p.add_link("http://somewhere.com/", "Second link.")
 
     q = doc.new_quote()
     q.add(
@@ -40,7 +40,7 @@ def add(doc):
     q.linebreak()
     q.add("The name of the")
     q.add_indexed("Mr Sage", canonical="Sage, Mr")
-    q.add(".", prepend_blank=False)
+    q.add_raw(".")
 
     p = doc.new_paragraph()
     p.add("And a sentence after the quote.")
@@ -51,7 +51,7 @@ def add(doc):
         p.add("First sentence in the top-level section.")
         p.add("Here is another mention of")
         p.add_indexed("Sage", canonical="Sage, Mr")
-        p.add(".", prepend_blank=False)
+        p.add_raw(".")
         with doc.new_section("Second-level section"):
             p = doc.new_paragraph()
             p.add("First sentence in the second-level section.")
@@ -76,7 +76,7 @@ def add(doc):
         )
         p.add("Here is yet another mention of")
         p.add_indexed("Sage", canonical="Sage, Mr")
-        p.add(".", prepend_blank=False)
+        p.add_raw(".")
 
 
 if __name__ == "__main__":
