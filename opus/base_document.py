@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.4"
+VERSION = "0.5.5"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -48,20 +48,20 @@ class BaseDocument:
         self.sections_counts = [0]
         self.footnotes = []
 
-    def __call__(self, text=None):
-        "Create a new paragraph, add the text to it and return it."
-        p = self.new_paragraph()
-        if text:
-            p.add(text)
-        return p
-
-    def new_paragraph(self):
+    def new_paragraph(self, text=None):
+        "Create a new paragraph, add the text (if any) to it and return it."
         raise NotImplementedError
 
-    def new_quote(self):
+    def p(self, text=None):
+        "Create a new paragraph, add the text (if any) to it and return it."
+        return self.new_paragraph(text=text)
+
+    def new_quote(self, text=None):
+        "Create a new quotation paragraph, add the text (if any) to it and return it."
         raise NotImplementedError
 
     def new_section(self, title):
+        "Add a new section, which is a context that increments the section level."
         raise NotImplementedError
 
     @property
@@ -77,53 +77,67 @@ class BaseDocument:
     def flush(self):
         pass
 
-    def write(self, filepath):
-        raise NotImplementedError
+    @contextmanager
+    def no_numbers(self):
+        self.old_paragraph_numbers = self.paragraph_numbers
+        self.paragraph_numbers = False
+        self.old_section_numbers = self.section_numbers
+        self.section_numbers = False
+        try:
+            yield self
+        finally:
+            self.paragraph_numbers = self.old_paragraph_numbers
+            self.section_numbers = self.old_section_numbers
+
+    def output_final(self):
+        "Output footnotes, references and index."
+        self.output_footnotes()
+        if self.references:
+            self.references.output(self)
+        self.output_indexed()
 
     def output_footnotes(self):
+        "Output the footnotes to the document."
         if not self.footnotes:
             return
         level = self.section_level
         if level != self.footnotes_level:
             return
-        paragraph_numbers = self.paragraph_numbers
-        self.paragraph_numbers = False
-        section_numbers = self.section_numbers
-        self.section_numbers = False
-        if level == 0:
-            with self.new_section(self.footnotes_title):
+        self.flush()
+        with self.no_numbers():
+            if level == 0:
+                with self.new_section(self.footnotes_title):
+                    self.output_footnotes_list()
+            else:
+                p = self.new_paragraph()
+                with p.italic():
+                    with p.bold():
+                        p += self.footnotes_title
                 self.output_footnotes_list()
-        else:
-            p = self.new_paragraph()
-            with p.italic():
-                with p.bold():
-                    p += self.footnotes_title
-            self.output_footnotes_list()
-        self.paragraph_numbers = paragraph_numbers
-        self.section_numbers = section_numbers
-        self.footnotes = []
+            self.flush()
 
     def output_footnotes_list(self):
+        "Output the list of footnotes to the document."
         for footnote in self.footnotes:
             p = self.new_paragraph()
             with p.bold():
-                p += f"{footnote.number}. "
+               p += f"{footnote.number}."
             for item in footnote.items:
                 match item.type:
                     case "text":
                         p.add(item.text)
+                    case "text_raw":
+                        p.add_raw(item.text)
                     case "indexed":
-                        p.add_indexed(
-                            item.text,
-                            canonical=item.canonical,
-                            prepend_blank=item.prepend_blank,
-                        )
+                        p.add_indexed(item.text, canonical=item.canonical)
                     case "link":
-                        p.add_link(
-                            item.text, item.href, prepend_blank=item.prepend_blank
-                        )
+                        p.add_link(item.href, item.text)
                     case "reference":
                         p.add_reference(item.text)
+        self.footnotes = []
+
+    def output_indexed(self):
+        raise NotImplementedError
 
 
 class BaseSection:
@@ -133,15 +147,13 @@ class BaseSection:
         self.title = title
         self.document.sections_counts[-1] += 1
 
-    def __call__(self, text=None):
-        "Create a new paragraph, add the text to it and return it."
-        p = self.new_paragraph()
-        if text:
-            p.add(text)
-        return p
+    def new_paragraph(self, text=None):
+        "Create a new paragraph, add the text, if any, to it and return it."
+        return self.document.new_paragraph(text=text)
 
-    def new_paragraph(self):
-        return self.document.new_paragraph()
+    def p(self, text=None):
+        "Create a new paragraph, add the text, if any, to it and return it."
+        return self.document.new_paragraph(text=text)
 
     def number(self):
         return ".".join([str(n) for n in self.document.sections_counts[:-1]]) + "."
@@ -179,30 +191,39 @@ class BaseParagraph:
         self.add(text)
         return self
 
-    def add(self, text, prepend_blank=True):
+    def add(self, text):
+        """Add the text to the paragraph.
+        - Exchanges newlines for blanks.
+        - Removes superfluous blanks.
+        - Prepends a blank.
+        """
+        raise NotImplementedError
+
+    def add_raw(self, text):
+        "Add the text as is to the paragraph."
         raise NotImplementedError
 
     def linebreak(self):
         raise NotImplementedError
 
-    def add_indexed(self, text, canonical=None, prepend_blank=True):
+    def add_indexed(self, text, canonical=None):
         raise NotImplementedError
 
-    def add_link(self, text, href, prepend_blank=True):
+    def add_link(self, href, text=None):
         raise NotImplementedError
 
-    def add_reference(self, name, prepend_blank=True):
+    def add_reference(self, name):
         assert isinstance(name, str)
         if self.document.references:
             self.document.references.add(self, name)
         else:
-            self.add(name, prepend_blank=prepend_blank)
+            self.add(name)
 
     def new_footnote(self):
         footnote = Footnote(self, len(self.document.footnotes) + 1)
         with self.bold():
             with self.superscript():
-                self.add(str(footnote.number), prepend_blank=False)
+                self.add_raw(str(footnote.number))
         self.document.footnotes.append(footnote)
         return footnote
 
@@ -242,15 +263,15 @@ class Footnote:
         assert isinstance(text, str)
         self.items.append(FootnoteItem("text", text))
 
-    def add_indexed(self, text, canonical=None, prepend_blank=True):
-        self.items.append(
-            Footnote("indexed", text, canonical=canonical, prepend_blank=prepend_blank)
-        )
+    def add_raw(self, text):
+        assert isinstance(text, str)
+        self.items.append(FootnoteItem("text_raw", text))
 
-    def add_link(self, text, href, prepend_blank=True):
-        self.items.append(
-            FootnoteItem("link", text, href=href, prepend_blank=prepend_blank)
-        )
+    def add_indexed(self, text, canonical=None):
+        self.items.append(Footnote("indexed", text, canonical=canonical))
+
+    def add_link(self, href, text=None):
+        self.items.append(FootnoteItem("link", text=text or href, href=href))
 
     def add_reference(self, name):
         self.items.append(FootnoteItem("reference", name))
@@ -263,4 +284,3 @@ class FootnoteItem:
     text: str
     canonical: str = None
     href: str = None
-    prepend_blank: bool = True

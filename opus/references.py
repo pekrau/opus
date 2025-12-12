@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+MAX_AUTHORS = 2
+
 
 class References:
     "Reference database handler."
@@ -45,30 +47,70 @@ class References:
             name = f"[ref? {name}]"
         self.formatter.add_short(paragraph, name)
 
-    def write(self, document, items=None):
-        "Write out list of references; by default those that have been marked used."
-        paragraph_numbers = document.paragraph_numbers
-        document.paragraph_numbers = False
-        section_numbers = document.section_numbers
-        document.section_numbers = False
-        if items is None:
-            items = [self[name] for name in sorted(self.used)]
-        with document.new_section(document.references_title):
-            for item in items:
-                self.formatter.add_full(document, item)
-        document.flush()
-        document.paragraph_numbers = paragraph_numbers
-        document.section_numbers = section_numbers
+    def output(self, document, items=None):
+        "Output list of references; by default those that have been marked used."
+        if not self.used:
+            return
+        with document.no_numbers():
+            if items is None:
+                items = [self[name] for name in sorted(self.used)]
+            with document.new_section(document.references_title):
+                for item in items:
+                    self.formatter.add_full(document, item)
+            document.flush()
 
 
 class DefaultReferenceFormatter:
 
     def add_short(self, paragraph, name):
-        paragraph.add(name)
+        with paragraph.bold():
+            paragraph.add(name)
 
     def add_full(self, document, item):
         p = document.new_paragraph()
-        p.add(f"{item['name']}. {item['title']}.")
+        authors = item.get("authors") or []
+        p.add(", ".join([self.format_name(a) for a in authors[:MAX_AUTHORS]]))
+        if len(authors) > MAX_AUTHORS:
+            p.add_raw(",")
+            with p.italic():
+                p.add("et al.")
+        p.add(item["year"])
+        if published := item.get("edition_published"):
+            p.add(f"[{published}]")
+        p.add_raw(".")
+
+        match item["type"]:
+            case "book":
+                with p.italic():
+                    p.add(f"{item['title'].rstrip('.')}.")
+                    if subtitle := item.get("subtitle"):
+                        p.add(f"{subtitle.rstrip('.')}.")
+                if item.get("publisher"):
+                    p.add(f"{item['publisher']}.")
+            case "article":
+                p.add(f"{item['title'].rstrip('.')}.")
+                with p.italic():
+                    p.add(item["journal"])
+                if volume := item.get("volume"):
+                    p.add_raw(f", {volume}")
+                if number := item.get("number"):
+                    p.add_raw(f"({number})")
+                if pages := item.get("pages"):
+                    p.add_raw(f", {pages.replace('--', '-')}.")
+            case "website":
+                p.add(f"{item['title'].rstrip('.')}.")
+                p.add_link(item["url"])
+                if accessed := item.get("accessed"):
+                    p.add(f"({accessed})")
+
+    def format_name(self, author):
+        parts = [p.strip() for p in author.split(",")]
+        name = parts[0]
+        if len(parts) > 1:
+            name += ", " + parts[1].split()[0]
+            if len(parts) > 2:
+                name += ", " + parts[2]
+        return name
 
 
 if __name__ == "__main__":

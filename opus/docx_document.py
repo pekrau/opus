@@ -150,15 +150,24 @@ class Document(BaseDocument):
 
         return result
 
-    def new_paragraph(self):
+    def new_paragraph(self, text=None):
+        "Create a new paragraph, add the text (if any) to it and return it."
         self.paragraphs_count += 1
-        return Paragraph(self)
+        paragraph = Paragraph(self)
+        if text:
+            paragraph.add(text)
+        return paragraph
 
     def new_quote(self):
+        "Create a new quotation paragraph, add the text (if any) to it and return it."
         self.paragraphs_count += 1
-        return Quote(self)
+        paragraph = Quote(self)
+        if text:
+            paragraph.add(text)
+        return paragraph
 
     def new_section(self, title):
+        "Add a new section, which is a context that increments the section level."
         return Section(self, title)
 
     def new_page(self):
@@ -169,17 +178,19 @@ class Document(BaseDocument):
         self.page_number = number
 
     def write(self, filepath):
-        self.output_footnotes()
-        if self.references and self.references.used:
-            self.references.write(self)
-        if self.indexed:
+        self.output_final()
+        self.docx.save(filepath)
+
+    def output_indexed(self):
+        if not self.indexed:
+            return
+        with self.no_numbers():
             with self.new_section(self.index_title):
                 p = self.new_paragraph()
                 for canonical, page_numbers in self.indexed.items():
                     numbers = ", ".join([str(n) for n in sorted(page_numbers)])
                     p.add(f"{canonical},\t{numbers}")
                     p.linebreak()
-        self.docx.save(filepath)
 
 
 class Section(BaseSection):
@@ -196,9 +207,7 @@ class Section(BaseSection):
             cells[0].text = title
             cells[0].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
             cells[0].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
-            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
-                3 * (level - 1)
-            )
+            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(3*(level-1))
             cells[1].text = str(self.document.page_number)
             cells[1].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
             cells[1].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
@@ -221,40 +230,39 @@ class Paragraph(BaseParagraph):
         if document.paragraph_numbers:
             self.add(f"({document.paragraphs_count})")
 
-    def add(self, text, prepend_blank=True):
+    def add(self, text):
+        """Add the text to the paragraph.
+        - Exchanges newlines for blanks.
+        - Removes superfluous blanks.
+        - Prepends a blank.
+        """
         assert isinstance(text, str)
-        lines = [l.strip() for l in text.split("\n")]
-        lines = [l for l in lines if l]
+        lines = list(text.split())
         if not lines:
             return
-        length = len(lines)
-        if length >= 2:
-            zipped = []
-            for a, b in zip(lines, [" "] * (length - 1)):
-                zipped.append(a)
-                zipped.append(b)
-            zipped.append(lines[-1])
-            lines = zipped
-        if prepend_blank:
-            lines.insert(0, " ")
-        self.set_font_style(self.paragraph.add_run("".join(lines)))
+        result = [" "]
+        for line in lines[:-1]:
+            result.append(line)
+            result.append(" ")
+        result.append(lines[-1])
+        self.set_font_style(self.paragraph.add_run("".join(result)))
+
+    def add_raw(self, text):
+        self.set_font_style(self.paragraph.add_run(text))
 
     def linebreak(self):
         self.paragraph.add_run("\n")
 
-    def add_indexed(self, text, canonical=None, prepend_blank=True):
-        if prepend_blank:
-            self.set_font_style(self.paragraph.add_run(" "))
+    def add_indexed(self, text, canonical=None):
+        self.add_raw(" ")
         with self.underline():
-            self.add(text, prepend_blank=False)
+            self.add_raw(text)
         self.document.indexed.setdefault(canonical or text, set()).add(
             self.document.page_number
         )
 
-    def add_link(self, text, href, prepend_blank=True):
-        assert isinstance(text, str)
-        if prepend_blank:
-            self.set_font_style(self.paragraph.add_run(" "))
+    def add_link(self, href, text=None):
+        self.add_raw(" ")
 
         # https://github.com/python-openxml/python-docx/issues/74#issuecomment-261169410
         # This works in 'writethatbook', but not here??
@@ -267,10 +275,7 @@ class Paragraph(BaseParagraph):
 
         # Create the w:hyperlink tag and add needed values
         hyperlink = docx.oxml.shared.OxmlElement("w:hyperlink")
-        hyperlink.set(
-            docx.oxml.shared.qn("r:id"),
-            r_id,
-        )
+        hyperlink.set(docx.oxml.shared.qn("r:id"), r_id)
 
         # Create a w:r element and a new w:rPr element and join together
         new_run = docx.oxml.shared.OxmlElement("w:r")
@@ -278,32 +283,11 @@ class Paragraph(BaseParagraph):
         new_run.append(rPr)
 
         # Style and add text to the w:r element
-        new_run.text = text
+        new_run.text = text or href
         new_run.style = "Hyperlink"
         hyperlink.append(new_run)
 
         self.paragraph._p.append(hyperlink)
-
-        # # https://stackoverflow.com/questions/47666642/adding-an-hyperlink-in-msword-by-using-python-docx
-        # # This gets access to the document.xml.rels file and gets a new relation id value.
-        # part = self.paragraph.part
-        # r_id = part.relate_to(
-        #     href, docx.opc.constants.RELATIONSHIP_TYPE.HYPERLINK, is_external=True
-        # )
-
-        # # Create the w:hyperlink tag and add needed values.
-        # hyperlink = docx.oxml.shared.OxmlElement("w:hyperlink")
-        # hyperlink.set(docx.oxml.shared.qn("r:id"), r_id)
-
-        # # Create a new run object (a wrapper over a 'w:r' element)
-        # new_run = docx.text.run.Run(docx.oxml.shared.OxmlElement("w:r"), self.paragraph)
-        # new_run.text = text
-        # new_run.style = "Hyperlink"
-        # self.set_font_style(new_run)
-
-        # # Join the XML elements together.
-        # hyperlink.append(new_run._element)
-        # self.paragraph._p.append(hyperlink)
 
     @contextmanager
     def bold(self):

@@ -26,7 +26,7 @@ NORMAL_FONT = "Helvetica"
 NORMAL_FONT_SIZE = 12
 NORMAL_LEADING = 18
 NORMAL_SPACE_BEFORE = 6
-NORMAL_SPACE_AFTER = 6
+NORMAL_SPACE_AFTER = 12
 TITLE_FONT_SIZE = 24
 TITLE_LEADING = 30
 TITLE_SPACE_AFTER = 15
@@ -141,7 +141,7 @@ class Document(BaseDocument):
 
         self.paragraph = None
         self.index = SimpleIndex(style=self.stylesheet["Normal"], headers=False)
-        self.any_indexed = False
+        self.indexed = False
         self.flowables = []
         self.toc = None
 
@@ -190,19 +190,26 @@ class Document(BaseDocument):
         )
         self.flowables.append(self.toc)
 
-    def new_paragraph(self):
+    def new_paragraph(self, text=None):
+        "Create a new paragraph, add the text (if any) to it and return it."
         self.flush()
         self.paragraphs_count += 1
         self.paragraph = Paragraph(self)
+        if text:
+            self.paragraph.add(text)
         return self.paragraph
 
-    def new_quote(self):
+    def new_quote(self, text=None):
+        "Create a new quotation paragraph, add the text (if any) to it and return it."
         self.flush()
         self.paragraphs_count += 1
         self.paragraph = Quote(self)
+        if text:
+            self.paragraph.add(text)
         return self.paragraph
 
     def new_section(self, title):
+        "Add a new section, which is a context that increments the section level."
         self.setup_toc()
         self.flush()
         return Section(self, title)
@@ -221,10 +228,7 @@ class Document(BaseDocument):
             self.paragraph = None
 
     def write(self, filepath):
-        self.flush()
-        self.output_footnotes()
-        if self.references and self.references.used:
-            self.references.write(self)
+        self.output_final()
         output = io.BytesIO()
         kwargs = dict(
             title=self.title,
@@ -236,12 +240,13 @@ class Document(BaseDocument):
             pdfdoc = TocDocTemplate(output, self.toc_level, **kwargs)
         else:
             pdfdoc = SimpleDocTemplate(output, **kwargs)
-        if self.any_indexed:
-            self.new_page()
-            self.flowables.append(
-                PdfParagraph(self.index_title, style=self.stylesheet["Heading1"])
-            )
-            self.flowables.append(self.index)
+        if self.indexed:
+            with self.no_numbers():
+                self.new_page()
+                self.flowables.append(
+                    PdfParagraph(self.index_title, style=self.stylesheet["Heading1"])
+                )
+                self.flowables.append(self.index)
             if self.toc_level:
                 pdfdoc.multiBuild(
                     self.flowables,
@@ -269,6 +274,10 @@ class Document(BaseDocument):
         canvas.setFont(NORMAL_FONT, NORMAL_FONT_SIZE)
         canvas.drawString(width - 84, height - 56, str(pdfdoc.page))
         canvas.restoreState()
+
+    def output_indexed(self):
+        "This is done in 'write' using a reportlab feature."
+        pass
 
 
 class TocDocTemplate(SimpleDocTemplate):
@@ -309,30 +318,35 @@ class Paragraph(BaseParagraph):
         super().__init__(document)
         self.contents = []
 
-    def add(self, text, prepend_blank=True):
+    def add(self, text):
+        """Add the text to the paragraph.
+        - Exchanges newlines for blanks.
+        - Removes superfluous blanks.
+        - Prepends a blank.
+        """
         assert isinstance(text, str)
-        if prepend_blank:
-            self.contents.append(" ")
+        self.contents.append(" ")
+        self.contents.append(text) # No cleanup needed; reportlab does that.
+
+    def add_raw(self, text):
+        assert isinstance(text, str)
         self.contents.append(text)
 
     def linebreak(self):
         self.contents.append("<br/>")
 
-    def add_indexed(self, text, canonical=None, prepend_blank=True):
+    def add_indexed(self, text, canonical=None):
+        self.contents.append(" ")
         if canonical:
             canonical = canonical.replace(",", ",,")
-        if prepend_blank:
-            self.contents.append(" ")
         with self.underline():
             self.contents.append(f'<index item="{canonical or text}">{text}</index>')
-        self.document.any_indexed = True
+        self.document.indexed = True
 
-    def add_link(self, text, href, prepend_blank=True):
-        assert isinstance(text, str)
-        if prepend_blank:
-            self.contents.append(" ")
+    def add_link(self, href, text=None):
+        self.contents.append(" ")
         self.contents.append(
-            f'<link href="{href}" underline="true" color="blue">{text}</link>'
+            f'<link href="{href}" underline="true" color="blue">{text or href}</link>'
         )
 
     @contextmanager
