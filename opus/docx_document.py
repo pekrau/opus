@@ -43,8 +43,10 @@ class Document(BaseDocument):
         p = None
         if self.title:
             p = self.docx.add_heading(self.title, 0)
+        if self.subtitle:
+            p = self.docx.add_heading(self.subtitle, 1)
         if self.authors:
-            p = self.docx.add_heading(", ".join(self.authors), 1)
+            p = self.docx.add_heading(", ".join(self.authors), 2)
         if self.version:
             p = self.docx.add_paragraph(self.version)
         if p:

@@ -149,6 +149,10 @@ class Document(BaseDocument):
             self.flowables.append(
                 PdfParagraph(self.title, style=self.stylesheet["Title"])
             )
+        if self.subtitle:
+            self.flowables.append(
+                PdfParagraph(self.subtitle, style=self.stylesheet["Subtitle"])
+            )
         if self.authors:
             self.flowables.append(
                 PdfParagraph(", ".join(self.authors), style=self.stylesheet["Authors"])

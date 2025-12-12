@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.3"
+VERSION = "0.5.4"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -13,6 +13,7 @@ class BaseDocument:
     def __init__(
         self,
         title=None,
+        subtitle=None,
         authors=None,
         version=None,
         language="sv-SE",
@@ -28,6 +29,7 @@ class BaseDocument:
         footnotes_title="Fotnoter",
     ):
         self.title = title
+        self.subtitle = subtitle
         self.authors = authors
         self.version = version
         self.language = language
