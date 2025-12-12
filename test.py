@@ -39,8 +39,8 @@ def add(doc):
     q.linebreak()
     q.linebreak()
     q.add("The name of the")
-    q.add_indexed("Mr Sage", canonical="Sage, Mr", append_blank=False)
-    q.add(".")
+    q.add_indexed("Mr Sage", canonical="Sage, Mr")
+    q.add(".", prepend_blank=False)
 
     p = doc.new_paragraph()
     p.add("And a sentence after the quote.")
@@ -50,8 +50,8 @@ def add(doc):
         p = doc.new_paragraph()
         p.add("First sentence in the top-level section.")
         p.add("Here is another mention of")
-        p.add_indexed("Sage", canonical="Sage, Mr", append_blank=False)
-        p.add(".")
+        p.add_indexed("Sage", canonical="Sage, Mr")
+        p.add(".", prepend_blank=False)
         with doc.new_section("Second-level section"):
             p = doc.new_paragraph()
             p.add("First sentence in the second-level section.")
@@ -75,8 +75,8 @@ def add(doc):
             This should appear on a new page."""
         )
         p.add("Here is yet another mention of")
-        p.add_indexed("Sage", canonical="Sage, Mr", append_blank=False)
-        p.add(".")
+        p.add_indexed("Sage", canonical="Sage, Mr")
+        p.add(".", prepend_blank=False)
 
 
 if __name__ == "__main__":

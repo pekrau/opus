@@ -1,10 +1,12 @@
 "Base document interface."
 
-VERSION = "0.5.1"
+VERSION = "0.5.3"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+import icecream
+icecream.install()
 
 class BaseDocument:
 
@@ -22,6 +24,7 @@ class BaseDocument:
         index_title="Index",
         references=None,
         references_title="Referenser",
+        footnotes_level=0,
         footnotes_title="Fotnoter",
     ):
         self.title = title
@@ -36,6 +39,7 @@ class BaseDocument:
         self.index_title = index_title
         self.references = references
         self.references_title = references_title
+        self.footnotes_level = footnotes_level
         self.footnotes_title = footnotes_title
 
         self.paragraphs_count = 0
@@ -58,11 +62,18 @@ class BaseDocument:
     def new_section(self, title):
         raise NotImplementedError
 
+    @property
+    def section_level(self):
+        return len(self.sections_counts) - 1
+
     def new_page(self):
         raise NotImplementedError
 
     def set_page_number(self, number):
         raise NotImplementedError
+
+    def flush(self):
+        pass
 
     def write(self, filepath):
         raise NotImplementedError
@@ -70,10 +81,27 @@ class BaseDocument:
     def output_footnotes(self):
         if not self.footnotes:
             return
-        p = self.new_paragraph()
-        with p.italic():
-            with p.bold():
-                p += self.footnotes_title
+        level = self.section_level
+        if level != self.footnotes_level:
+            return
+        paragraph_numbers = self.paragraph_numbers
+        self.paragraph_numbers = False
+        section_numbers = self.section_numbers
+        self.section_numbers = False
+        if level == 0:
+            with self.new_section(self.footnotes_title):
+                self.output_footnotes_list()
+        else:
+            p = self.new_paragraph()
+            with p.italic():
+                with p.bold():
+                    p += self.footnotes_title
+            self.output_footnotes_list()
+        self.paragraph_numbers = paragraph_numbers
+        self.section_numbers = section_numbers
+        self.footnotes = []
+
+    def output_footnotes_list(self):
         for footnote in self.footnotes:
             p = self.new_paragraph()
             with p.bold():
@@ -94,7 +122,6 @@ class BaseDocument:
                         )
                     case "reference":
                         p.add_reference(item.text)
-        self.footnotes = []
 
 
 class BaseSection:
@@ -125,7 +152,7 @@ class BaseSection:
 
     def at_enter(self):
         self.document.sections_counts.append(0)
-        level = len(self.document.sections_counts) - 1
+        level = self.document.section_level
         if level <= self.document.page_break_level:
             self.document.new_page()
         if self.document.section_numbers:

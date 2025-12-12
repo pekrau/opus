@@ -20,7 +20,7 @@ from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
 from .base_document import *
 
 
-__all__ = ["Document", "VERSION"]
+__all__ = ["Document"]
 
 NORMAL_FONT = "Helvetica"
 NORMAL_FONT_SIZE = 12
@@ -164,8 +164,7 @@ class Document(BaseDocument):
             return
         if self.toc is not None:
             return
-        if self.paragraph:
-            self.paragraph.output()
+        self.flush()
         self.flowables.append(PageBreak())
         self.flowables.append(
             PdfParagraph(self.toc_title, style=self.stylesheet["Contents"])
@@ -188,43 +187,40 @@ class Document(BaseDocument):
         self.flowables.append(self.toc)
 
     def new_paragraph(self):
-        if self.paragraph:
-            self.paragraph.output()
+        self.flush()
         self.paragraphs_count += 1
         self.paragraph = Paragraph(self)
         return self.paragraph
 
     def new_quote(self):
-        if self.paragraph:
-            self.paragraph.output()
+        self.flush()
         self.paragraphs_count += 1
         self.paragraph = Quote(self)
         return self.paragraph
 
     def new_section(self, title):
         self.setup_toc()
-        if self.paragraph:
-            self.paragraph.output()
-            self.paragraph = None
+        self.flush()
         return Section(self, title)
 
     def new_page(self):
-        if self.paragraph:
-            self.paragraph.output()
-            self.paragraph = None
+        self.flush()
         self.flowables.append(NotAtTopPageBreak())
 
     def set_page_number(self, number):
         "Not needed for PDF."
         pass
 
+    def flush(self):
+        if self.paragraph:
+            self.paragraph.output()
+            self.paragraph = None
+
     def write(self, filepath):
-        self.paragraph.output()
-        self.section_numbers = False
-        self.paragraph_numbers = False
+        self.flush()
+        self.output_footnotes()
         if self.references and self.references.used:
             self.references.write(self)
-        self.paragraph.output()
         output = io.BytesIO()
         kwargs = dict(
             title=self.title,
@@ -311,9 +307,9 @@ class Paragraph(BaseParagraph):
 
     def add(self, text, prepend_blank=True):
         assert isinstance(text, str)
-        self.contents.append(text)
         if prepend_blank:
             self.contents.append(" ")
+        self.contents.append(text)
 
     def linebreak(self):
         self.contents.append("<br/>")
@@ -321,11 +317,10 @@ class Paragraph(BaseParagraph):
     def add_indexed(self, text, canonical=None, prepend_blank=True):
         if canonical:
             canonical = canonical.replace(",", ",,")
+        if prepend_blank:
+            self.contents.append(" ")
         with self.underline():
-            self.add(
-                f'<index item="{canonical or text}">{text}</index>',
-                prepend_blank=prepend_blank,
-            )
+            self.contents.append(f'<index item="{canonical or text}">{text}</index>')
         self.document.any_indexed = True
 
     def add_link(self, text, href, prepend_blank=True):

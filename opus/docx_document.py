@@ -9,7 +9,7 @@ import docx.styles.style
 
 from .base_document import *
 
-__all__ = ["Document", "VERSION"]
+__all__ = ["Document"]
 
 MAX_LEVEL = 6
 HEADER_SPACE_BEFORE = 14
@@ -167,8 +167,7 @@ class Document(BaseDocument):
         self.page_number = number
 
     def write(self, filepath):
-        self.section_numbers = False
-        self.paragraph_numbers = False
+        self.output_footnotes()
         if self.references and self.references.used:
             self.references.write(self)
         if self.indexed:
@@ -242,8 +241,10 @@ class Paragraph(BaseParagraph):
         self.paragraph.add_run("\n")
 
     def add_indexed(self, text, canonical=None, prepend_blank=True):
+        if prepend_blank:
+            self.set_font_style(self.paragraph.add_run(" "))
         with self.underline():
-            self.add(text, prepend_blank=prepend_blank)
+            self.add(text, prepend_blank=False)
         self.document.indexed.setdefault(canonical or text, set()).add(
             self.document.page_number
         )
@@ -251,7 +252,7 @@ class Paragraph(BaseParagraph):
     def add_link(self, text, href, prepend_blank=True):
         assert isinstance(text, str)
         if prepend_blank:
-            self.paragraph.add_run(" ")
+            self.set_font_style(self.paragraph.add_run(" "))
 
         # https://github.com/python-openxml/python-docx/issues/74#issuecomment-261169410
         # This works in 'writethatbook', but not here??

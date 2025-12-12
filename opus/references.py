@@ -9,10 +9,11 @@ class References:
     "Reference database handler."
 
     def __init__(self, dirpath, formatter=None):
+        self.dirpath = Path(dirpath).expanduser().resolve()
         self.formatter = formatter or DefaultReferenceFormatter()
         self.items = {}
-        for filepath in Path(dirpath).iterdir():
-            if filepath.stem == "template":
+        for filepath in self.dirpath.iterdir():
+            if filepath.stem.startswith("template"):
                 continue
             if filepath.suffix != ".yaml":
                 continue
@@ -46,11 +47,18 @@ class References:
 
     def write(self, document, items=None):
         "Write out list of references; by default those that have been marked used."
+        paragraph_numbers = document.paragraph_numbers
+        document.paragraph_numbers = False
+        section_numbers = document.section_numbers
+        document.section_numbers = False
         if items is None:
             items = [self[name] for name in sorted(self.used)]
         with document.new_section(document.references_title):
             for item in items:
                 self.formatter.add_full(document, item)
+        document.flush()
+        document.paragraph_numbers = paragraph_numbers
+        document.section_numbers = section_numbers
 
 
 class DefaultReferenceFormatter:

@@ -4,6 +4,8 @@ import opus
 
 setup(
     name="opus",
+    packages=["opus-python"],
+    package_dir={"opus-python": "opus"},
     version=opus.__version__,
     description="Text defined in Python for output to different formats.",
     author="Per Kraulis",
