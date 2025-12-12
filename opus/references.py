@@ -74,6 +74,7 @@ class DefaultReferenceFormatter:
             p.add_raw(",")
             with p.italic():
                 p.add("et al.")
+        p.add_raw(".")
         p.add(item["year"])
         if published := item.get("edition_published"):
             p.add(f"[{published}]")

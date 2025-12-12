@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.5"
+VERSION = "0.5.6"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -154,6 +154,10 @@ class BaseSection:
     def p(self, text=None):
         "Create a new paragraph, add the text, if any, to it and return it."
         return self.document.new_paragraph(text=text)
+
+    def new_quote(self, text=None):
+        "Create a new quotation paragraph, add the text (if any) to it and return it."
+        return self.document.new_quote(text=text)
 
     def number(self):
         return ".".join([str(n) for n in self.document.sections_counts[:-1]]) + "."

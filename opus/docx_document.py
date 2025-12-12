@@ -158,7 +158,7 @@ class Document(BaseDocument):
             paragraph.add(text)
         return paragraph
 
-    def new_quote(self):
+    def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         self.paragraphs_count += 1
         paragraph = Quote(self)
