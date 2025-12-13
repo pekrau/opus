@@ -27,6 +27,7 @@ CODE_LINE_SPACING = 12
 CODE_INDENT = 10
 TITLE_PAGE_SPACER = 80
 HYPERLINK_COLOR = (0x05, 0x63, 0xC1)
+EMDASH = "\u2014"
 
 
 class Document(BaseDocument):
@@ -150,8 +151,13 @@ class Document(BaseDocument):
 
         return result
 
-    def new_paragraph(self, text=None):
-        "Create a new paragraph, add the text (if any) to it and return it."
+    def new_paragraph(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        """
+        if thematic_break:
+            p = self.docx.add_paragraph(EMDASH * 20, style="Normal")
+            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
         self.paragraphs_count += 1
         paragraph = Paragraph(self)
         if text:
@@ -222,6 +228,7 @@ class Paragraph(BaseParagraph):
     def __init__(self, document):
         super().__init__(document)
         self.paragraph = document.docx.add_paragraph(style=self.STYLESHEETNAME)
+        self.line_started = False
         self._bold = 0
         self._italic = 0
         self._underline = 0
@@ -230,39 +237,50 @@ class Paragraph(BaseParagraph):
         if document.paragraph_numbers:
             self.add(f"({document.paragraphs_count})")
 
-    def add(self, text):
+    def add(self, text, raw=False):
         """Add the text to the paragraph.
         - Exchanges newlines for blanks.
         - Removes superfluous blanks.
-        - Prepends a blank.
+        - Prepends a blank, if 'raw' is False.
         """
         assert isinstance(text, str)
         lines = list(text.split())
+        if raw or not self.line_started:
+            result = []
+        else:
+            result = [" "]
         if not lines:
             return
-        result = [" "]
         for line in lines[:-1]:
             result.append(line)
             result.append(" ")
         result.append(lines[-1])
         self.set_font_style(self.paragraph.add_run("".join(result)))
-
-    def add_raw(self, text):
-        self.set_font_style(self.paragraph.add_run(text))
+        self.line_started = True
 
     def linebreak(self):
         self.paragraph.add_run("\n")
+        self.line_started = False
 
-    def add_indexed(self, text, canonical=None):
-        self.add_raw(" ")
+    def emdash(self, raw=False):
+        if not raw and self.line_started:
+            self.set_font_style(self.paragraph.add_run(" "))
+        self.set_font_style(self.paragraph.add_run(EMDASH))
+        self.line_started = True
+
+    def indexed(self, text, canonical=None, raw=False):
+        if not raw and self.line_started:
+            self.set_font_style(self.paragraph.add_run(" "))
         with self.underline():
-            self.add_raw(text)
+            self.raw(text)
+        self.line_started = True
         self.document.indexed.setdefault(canonical or text, set()).add(
             self.document.page_number
         )
 
-    def add_link(self, href, text=None):
-        self.add_raw(" ")
+    def link(self, href, text=None, raw=False):
+        if not raw and self.line_started:
+            self.set_font_style(self.paragraph.add_run(" "))
 
         # https://github.com/python-openxml/python-docx/issues/74#issuecomment-261169410
         # This works in 'writethatbook', but not here??
@@ -288,6 +306,7 @@ class Paragraph(BaseParagraph):
         hyperlink.append(new_run)
 
         self.paragraph._p.append(hyperlink)
+        self.line_started = True
 
     @contextmanager
     def bold(self):

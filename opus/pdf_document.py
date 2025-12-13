@@ -12,8 +12,8 @@ from reportlab.platypus import (
     Spacer,
     PageBreak,
     NotAtTopPageBreak,
+    HRFlowable,
     SimpleDocTemplate,
-    LayoutError,
 )
 from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
 
@@ -190,9 +190,15 @@ class Document(BaseDocument):
         )
         self.flowables.append(self.toc)
 
-    def new_paragraph(self, text=None):
-        "Create a new paragraph, add the text (if any) to it and return it."
+    def new_paragraph(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        """
         self.flush()
+        if thematic_break:
+            self.flowables.append(
+                HRFlowable(width="60%", color=reportlab.lib.colors.black, spaceAfter=10)
+            )
         self.paragraphs_count += 1
         self.paragraph = Paragraph(self)
         if text:
@@ -318,33 +324,37 @@ class Paragraph(BaseParagraph):
         super().__init__(document)
         self.contents = []
 
-    def add(self, text):
+    def add(self, text, raw=False):
         """Add the text to the paragraph.
         - Exchanges newlines for blanks.
         - Removes superfluous blanks.
-        - Prepends a blank.
+        - Prepends a blank, if 'raw' is False.
         """
         assert isinstance(text, str)
-        self.contents.append(" ")
+        if not raw:
+            self.contents.append(" ")
         self.contents.append(text) # No cleanup needed; reportlab does that.
-
-    def add_raw(self, text):
-        assert isinstance(text, str)
-        self.contents.append(text)
 
     def linebreak(self):
         self.contents.append("<br/>")
 
-    def add_indexed(self, text, canonical=None):
-        self.contents.append(" ")
+    def emdash(self, raw=False):
+        if not raw:
+            self.contents.append(" ")
+        self.contents.append("\u2014")
+
+    def indexed(self, text, canonical=None, raw=False):
+        if not raw:
+            self.contents.append(" ")
         if canonical:
             canonical = canonical.replace(",", ",,")
         with self.underline():
             self.contents.append(f'<index item="{canonical or text}">{text}</index>')
         self.document.indexed = True
 
-    def add_link(self, href, text=None):
-        self.contents.append(" ")
+    def link(self, href, text=None, raw=False):
+        if not raw:
+            self.contents.append(" ")
         self.contents.append(
             f'<link href="{href}" underline="true" color="blue">{text or href}</link>'
         )

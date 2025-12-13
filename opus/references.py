@@ -39,13 +39,13 @@ class References:
     def __contains__(self, name):
         return name.casefold() in self.items
 
-    def add(self, paragraph, name):
+    def add(self, paragraph, name, raw=False):
         "Output the short form of the named reference, and mark as used."
         if name in self:
             self.used.add(name)
         else:
             name = f"[ref? {name}]"
-        self.formatter.add_short(paragraph, name)
+        self.formatter.add_short(paragraph, name, raw=raw)
 
     def output(self, document, items=None):
         "Output list of references; by default those that have been marked used."
@@ -62,23 +62,23 @@ class References:
 
 class DefaultReferenceFormatter:
 
-    def add_short(self, paragraph, name):
-        with paragraph.bold():
-            paragraph.add(name)
+    def add_short(self, paragraph, name, raw=False):
+        with paragraph.italic():
+            paragraph.add(name, raw=raw)
 
-    def add_full(self, document, item):
+    def add_full(self, document, item, raw=False):
         p = document.new_paragraph()
         authors = item.get("authors") or []
-        p.add(", ".join([self.format_name(a) for a in authors[:MAX_AUTHORS]]))
+        p.add(", ".join([self.format_name(a) for a in authors[:MAX_AUTHORS]]), raw=raw)
         if len(authors) > MAX_AUTHORS:
-            p.add_raw(",")
+            p.raw(",")
             with p.italic():
                 p.add("et al.")
-        p.add_raw(".")
+        p.raw(".")
         p.add(item["year"])
         if published := item.get("edition_published"):
             p.add(f"[{published}]")
-        p.add_raw(".")
+        p.raw(".")
 
         match item["type"]:
             case "book":
@@ -93,11 +93,11 @@ class DefaultReferenceFormatter:
                 with p.italic():
                     p.add(item["journal"])
                 if volume := item.get("volume"):
-                    p.add_raw(f", {volume}")
-                if number := item.get("number"):
-                    p.add_raw(f"({number})")
+                    p.raw(f", {volume}")
+                if issue := item.get("issue"):
+                    p.raw(f"({issue})")
                 if pages := item.get("pages"):
-                    p.add_raw(f", {pages.replace('--', '-')}.")
+                    p.raw(f", {pages.replace('--', '-')}.")
             case "website":
                 p.add(f"{item['title'].rstrip('.')}.")
                 p.add_link(item["url"])

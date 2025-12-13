@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.6"
+VERSION = "0.5.7"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -48,13 +48,18 @@ class BaseDocument:
         self.sections_counts = [0]
         self.footnotes = []
 
-    def new_paragraph(self, text=None):
-        "Create a new paragraph, add the text (if any) to it and return it."
+    def new_paragraph(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        """
         raise NotImplementedError
 
-    def p(self, text=None):
-        "Create a new paragraph, add the text (if any) to it and return it."
-        return self.new_paragraph(text=text)
+    def p(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        Syntactic sugar for 'new_paragraph'.
+        """
+        return self.new_paragraph(text=text, thematic_break=thematic_break)
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
@@ -124,16 +129,16 @@ class BaseDocument:
                p += f"{footnote.number}."
             for item in footnote.items:
                 match item.type:
-                    case "text":
+                    case "add":
                         p.add(item.text)
-                    case "text_raw":
-                        p.add_raw(item.text)
+                    case "raw":
+                        p.raw(item.text)
                     case "indexed":
-                        p.add_indexed(item.text, canonical=item.canonical)
+                        p.indexed(item.text, canonical=item.canonical)
                     case "link":
-                        p.add_link(item.href, item.text)
+                        p.link(item.href, item.text)
                     case "reference":
-                        p.add_reference(item.text)
+                        p.reference(item.text)
         self.footnotes = []
 
     def output_indexed(self):
@@ -147,13 +152,18 @@ class BaseSection:
         self.title = title
         self.document.sections_counts[-1] += 1
 
-    def new_paragraph(self, text=None):
-        "Create a new paragraph, add the text, if any, to it and return it."
-        return self.document.new_paragraph(text=text)
+    def new_paragraph(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        """
+        return self.document.new_paragraph(text=text, thematic_break=thematic_break)
 
-    def p(self, text=None):
-        "Create a new paragraph, add the text, if any, to it and return it."
-        return self.document.new_paragraph(text=text)
+    def p(self, text=None, thematic_break=False):
+        """Create a new paragraph, add the text (if any) to it and return it.
+        Optionally add a thematic break before it.
+        Syntactic sugar for 'new_paragraph'.
+        """
+        return self.p(text=text, thematic_break=thematic_break)
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
@@ -195,39 +205,42 @@ class BaseParagraph:
         self.add(text)
         return self
 
-    def add(self, text):
+    def add(self, text, raw=False):
         """Add the text to the paragraph.
         - Exchanges newlines for blanks.
         - Removes superfluous blanks.
-        - Prepends a blank.
+        - Prepends a blank, if 'raw' is False.
         """
         raise NotImplementedError
 
-    def add_raw(self, text):
-        "Add the text as is to the paragraph."
-        raise NotImplementedError
+    def raw(self, text):
+        "Add the text without prepended blank to the paragraph."
+        self.add(text, raw=True)
 
     def linebreak(self):
         raise NotImplementedError
 
-    def add_indexed(self, text, canonical=None):
+    def emdash(self, raw=False):
         raise NotImplementedError
 
-    def add_link(self, href, text=None):
+    def indexed(self, text, canonical=None, raw=False):
         raise NotImplementedError
 
-    def add_reference(self, name):
+    def link(self, href, text=None, raw=False):
+        raise NotImplementedError
+
+    def reference(self, name, raw=False):
         assert isinstance(name, str)
         if self.document.references:
-            self.document.references.add(self, name)
+            self.document.references.add(self, name, raw=raw)
         else:
-            self.add(name)
+            self.add(name, raw=raw)
 
     def new_footnote(self):
         footnote = Footnote(self, len(self.document.footnotes) + 1)
         with self.bold():
             with self.superscript():
-                self.add_raw(str(footnote.number))
+                self.raw(str(footnote.number))
         self.document.footnotes.append(footnote)
         return footnote
 
@@ -265,19 +278,19 @@ class Footnote:
 
     def add(self, text):
         assert isinstance(text, str)
-        self.items.append(FootnoteItem("text", text))
+        self.items.append(FootnoteItem("add", text))
 
-    def add_raw(self, text):
+    def raw(self, text):
         assert isinstance(text, str)
-        self.items.append(FootnoteItem("text_raw", text))
+        self.items.append(FootnoteItem("raw", text))
 
-    def add_indexed(self, text, canonical=None):
+    def indexed(self, text, canonical=None):
         self.items.append(Footnote("indexed", text, canonical=canonical))
 
-    def add_link(self, href, text=None):
+    def link(self, href, text=None):
         self.items.append(FootnoteItem("link", text=text or href, href=href))
 
-    def add_reference(self, name):
+    def reference(self, name):
         self.items.append(FootnoteItem("reference", name))
 
 
