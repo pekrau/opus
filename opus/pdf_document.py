@@ -214,11 +214,11 @@ class Document(BaseDocument):
             self.paragraph.add(text)
         return self.paragraph
 
-    def new_section(self, title):
+    def new_section(self, title, subtitle=None):
         "Add a new section, which is a context that increments the section level."
         self.setup_toc()
         self.flush()
-        return Section(self, title)
+        return Section(self, title, subtitle=subtitle)
 
     def new_page(self):
         self.flush()
@@ -313,6 +313,10 @@ class Section(BaseSection):
         self.document.flowables.append(
             PdfParagraph(title, style=self.document.stylesheet[f"Heading{level}"])
         )
+        if self.subtitle:
+            self.document.flowables.append(
+                PdfParagraph(self.subtitle, style=self.document.stylesheet[f"Heading{level+1}"])
+            )
         return self.document
 
 

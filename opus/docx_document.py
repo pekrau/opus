@@ -172,9 +172,9 @@ class Document(BaseDocument):
             paragraph.add(text)
         return paragraph
 
-    def new_section(self, title):
+    def new_section(self, title, subtitle=None):
         "Add a new section, which is a context that increments the section level."
-        return Section(self, title)
+        return Section(self, title, subtitle=subtitle)
 
     def new_page(self):
         self.page_number += 1
@@ -201,13 +201,15 @@ class Document(BaseDocument):
 
 class Section(BaseSection):
 
-    def __init__(self, document, title):
-        super().__init__(document, title)
+    def __init__(self, document, title, subtitle=None):
+        super().__init__(document, title, subtitle=subtitle)
         self.document.initialize_toc()
 
     def __enter__(self):
         title, level = self.at_enter()
         self.document.docx.add_heading(title, level=level)
+        if self.subtitle:
+            self.document.docx.add_heading(self.subtitle, level=level+1)
         if level <= self.document.toc_level:
             cells = self.document.toc_table.add_row().cells
             cells[0].text = title

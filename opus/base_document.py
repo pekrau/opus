@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.7"
+VERSION = "0.5.8"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -65,7 +65,7 @@ class BaseDocument:
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         raise NotImplementedError
 
-    def new_section(self, title):
+    def new_section(self, title, subtitle=None):
         "Add a new section, which is a context that increments the section level."
         raise NotImplementedError
 
@@ -147,9 +147,10 @@ class BaseDocument:
 
 class BaseSection:
 
-    def __init__(self, document, title):
+    def __init__(self, document, title, subtitle=None):
         self.document = document
         self.title = title
+        self.subtitle = subtitle
         self.document.sections_counts[-1] += 1
 
     def new_paragraph(self, text=None, thematic_break=False):
