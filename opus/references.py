@@ -41,11 +41,13 @@ class References:
 
     def add(self, paragraph, name, raw=False):
         "Output the short form of the named reference, and mark as used."
-        if name in self:
-            self.used.add(name)
+        try:
+            item = self[name]
+        except KeyError:
+            paragraph += f"[ref? {name}]"
         else:
-            name = f"[ref? {name}]"
-        self.formatter.add_short(paragraph, name, raw=raw)
+            self.used.add(name)
+            self.formatter.add_short(paragraph, item, raw=raw)
 
     def output(self, document, items=None):
         "Output list of references; by default those that have been marked used."
@@ -62,9 +64,9 @@ class References:
 
 class DefaultReferenceFormatter:
 
-    def add_short(self, paragraph, name, raw=False):
+    def add_short(self, paragraph, item, raw=False):
         with paragraph.italic():
-            paragraph.add(name, raw=raw)
+            paragraph.add(item["name"], raw=raw)
 
     def add_full(self, document, item, raw=False):
         p = document.new_paragraph()

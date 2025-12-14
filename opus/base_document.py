@@ -1,12 +1,14 @@
 "Base document interface."
 
-VERSION = "0.5.9"
+VERSION = "0.5.10"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 import icecream
+
 icecream.install()
+
 
 class BaseDocument:
 
@@ -131,7 +133,7 @@ class BaseDocument:
         for footnote in self.footnotes:
             p = self.new_paragraph()
             with p.bold():
-               p += f"{footnote.number}."
+                p += f"{footnote.number}."
             for item in footnote.items:
                 match item.type:
                     case "add":
@@ -324,13 +326,18 @@ class BaseList:
 
     def __exit__(self, *exc):
         pass
-    
+
     def new_item(self):
         raise NotImplementedError
 
+    def add_items(self, *texts):
+        for text in texts:
+            with self.new_item() as i:
+                i.p(text)
+
 
 class BaseListItem:
-    
+
     def __init__(self, list):
         self.list = list
 
@@ -339,7 +346,7 @@ class BaseListItem:
 
     def __exit__(self, *exc):
         pass
-    
+
     def new_paragraph(self, text=None):
         raise NotImplementedError
 

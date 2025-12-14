@@ -320,7 +320,9 @@ class Section(BaseSection):
         )
         if self.subtitle:
             self.document.flowables.append(
-                PdfParagraph(self.subtitle, style=self.document.stylesheet[f"Heading{level+1}"])
+                PdfParagraph(
+                    self.subtitle, style=self.document.stylesheet[f"Heading{level+1}"]
+                )
             )
         return self.document
 
@@ -342,7 +344,7 @@ class Paragraph(BaseParagraph):
         assert isinstance(text, str)
         if not raw:
             self.contents.append(" ")
-        self.contents.append(text) # No cleanup needed; reportlab does that.
+        self.contents.append(text)  # No cleanup needed; reportlab does that.
 
     def linebreak(self):
         self.contents.append("<br/>")
@@ -463,7 +465,7 @@ class ListItem(BaseListItem):
     def __exit__(self, *exc):
         self.flush()
         self.list.flowables.append(PdfListItem(self.flowables))
-    
+
     def new_paragraph(self, text=None):
         self.flush()
         self.paragraph = Paragraph(self.list.document)
@@ -488,4 +490,3 @@ class ListItem(BaseListItem):
         if self.paragraph:
             self.paragraph.output(flowables=self.flowables)
             self.paragraph = None
-

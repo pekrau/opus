@@ -25,11 +25,13 @@ def add(doc):
     with p.italic():
         p.link("http://somewhere.com/", "Second link.")
 
-    q = doc.new_quote("""This is a quote from a sage.
+    q = doc.new_quote(
+        """This is a quote from a sage.
         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
         do eiusmod tempor incididunt ut labore et dolore magna
         aliqua. Ut enim ad minim veniam, quis nostrud exercitation
-        ullamco laboris nisi ut aliquip ex ea commodo consequat.""")
+        ullamco laboris nisi ut aliquip ex ea commodo consequat."""
+    )
     q.linebreak()
     q.linebreak()
     q.add("The name of the")

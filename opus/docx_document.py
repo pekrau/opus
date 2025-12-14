@@ -210,13 +210,15 @@ class Section(BaseSection):
         title, level = self.at_enter()
         self.document.docx.add_heading(title, level=level)
         if self.subtitle:
-            self.document.docx.add_heading(self.subtitle, level=level+1)
+            self.document.docx.add_heading(self.subtitle, level=level + 1)
         if level <= self.document.toc_level:
             cells = self.document.toc_table.add_row().cells
             cells[0].text = title
             cells[0].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
             cells[0].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
-            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(3*(level-1))
+            cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
+                3 * (level - 1)
+            )
             cells[1].text = str(self.document.page_number)
             cells[1].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
             cells[1].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
@@ -387,13 +389,17 @@ class ListItem(BaseListItem):
 
     def __exit__(self, *exc):
         pass
-    
+
     def new_paragraph(self, text=None):
         if self.first_paragraph:
             if self.list.ordered:
-                paragraph = OrderedListItemParagraph(self.list.document, self.list.level)
+                paragraph = OrderedListItemParagraph(
+                    self.list.document, self.list.level
+                )
             else:
-                paragraph = UnorderedListItemParagraph(self.list.document, self.list.level)
+                paragraph = UnorderedListItemParagraph(
+                    self.list.document, self.list.level
+                )
             self.first_paragraph = False
         else:
             paragraph = ContinueListItemParagraph(self.list.document, self.list.level)
