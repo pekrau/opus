@@ -8,11 +8,13 @@ import reportlab.rl_config
 import reportlab.lib.colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph as PdfParagraph
+from reportlab.platypus import ListItem as PdfListItem
 from reportlab.platypus import (
     Spacer,
     PageBreak,
     NotAtTopPageBreak,
     HRFlowable,
+    ListFlowable,
     SimpleDocTemplate,
 )
 from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
@@ -199,7 +201,6 @@ class Document(BaseDocument):
             self.flowables.append(
                 HRFlowable(width="60%", color=reportlab.lib.colors.black, spaceAfter=10)
             )
-        self.paragraphs_count += 1
         self.paragraph = Paragraph(self)
         if text:
             self.paragraph.add(text)
@@ -208,7 +209,6 @@ class Document(BaseDocument):
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         self.flush()
-        self.paragraphs_count += 1
         self.paragraph = Quote(self)
         if text:
             self.paragraph.add(text)
@@ -224,11 +224,16 @@ class Document(BaseDocument):
         self.flush()
         self.flowables.append(NotAtTopPageBreak())
 
+    def new_list(self, ordered=False):
+        self.flush()
+        return List(self, ordered=ordered)
+
     def set_page_number(self, number):
         "Not needed for PDF."
         pass
 
     def flush(self):
+        "Flush out the current paragraph."
         if self.paragraph:
             self.paragraph.output()
             self.paragraph = None
@@ -403,12 +408,14 @@ class Paragraph(BaseParagraph):
         finally:
             self.contents.append("</super>")
 
-    def output(self):
+    def output(self, flowables=None):
         if not self.contents:
             return
         if self.document.paragraph_numbers:
             self.contents.insert(0, f"({self.document.paragraphs_count}) ")
-        self.document.flowables.append(
+        if flowables is None:
+            flowables = self.document.flowables
+        flowables.append(
             PdfParagraph(
                 "".join(self.contents),
                 style=self.document.stylesheet[self.STYLESHEETNAME],
@@ -420,3 +427,65 @@ class Paragraph(BaseParagraph):
 class Quote(Paragraph):
 
     STYLESHEETNAME = "Quote"
+
+
+class List(BaseList):
+
+    def __init__(self, document, ordered=False, parentlist=None):
+        super().__init__(document, ordered=ordered)
+        self.parentlist = parentlist
+
+    def __enter__(self):
+        self.flowables = []
+        return self
+
+    def __exit__(self, *exc):
+        if self.ordered:
+            style = self.document.stylesheet["OrderedList"]
+        else:
+            style = self.document.stylesheet["UnorderedList"]
+        if self.parentlist is None:
+            self.document.flowables.append(ListFlowable(self.flowables, style=style))
+        else:
+            self.parentlist.flowables.append(ListFlowable(self.flowables, style=style))
+
+    def new_item(self):
+        return ListItem(self)
+
+
+class ListItem(BaseListItem):
+
+    def __enter__(self):
+        self.flowables = []
+        self.paragraph = None
+        return self
+
+    def __exit__(self, *exc):
+        self.flush()
+        self.list.flowables.append(PdfListItem(self.flowables))
+    
+    def new_paragraph(self, text=None):
+        self.flush()
+        self.paragraph = Paragraph(self.list.document)
+        if text:
+            self.paragraph.add(text)
+        return self.paragraph
+
+    def new_quote(self, text=None):
+        self.flush()
+        self.paragraph = Quote(self.list.document)
+        if text:
+            self.paragraph.add(text)
+        return self.paragraph
+
+    # def new_list(self, ordered=False):
+    #     self.flush()
+    #     self.paragraph = List(self.list.document, ordered=ordered, parentlist=self.list)
+    #     return self.paragraph
+
+    def flush(self):
+        "Flush out the current paragraph."
+        if self.paragraph:
+            self.paragraph.output(flowables=self.flowables)
+            self.paragraph = None
+

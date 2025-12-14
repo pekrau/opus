@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.8"
+VERSION = "0.5.9"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -76,14 +76,19 @@ class BaseDocument:
     def new_page(self):
         raise NotImplementedError
 
+    def new_list(self, ordered=False):
+        raise NotImplementedError
+
     def set_page_number(self, number):
         raise NotImplementedError
 
     def flush(self):
+        "Flush out the current paragraph."
         pass
 
     @contextmanager
     def no_numbers(self):
+        "Within this context, do not output section or paragraph numbers."
         self.old_paragraph_numbers = self.paragraph_numbers
         self.paragraph_numbers = False
         self.old_section_numbers = self.section_numbers
@@ -170,6 +175,9 @@ class BaseSection:
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         return self.document.new_quote(text=text)
 
+    def new_list(self, ordered=False):
+        return self.document.new_list(self.document, ordered=ordered)
+
     def number(self):
         return ".".join([str(n) for n in self.document.sections_counts[:-1]]) + "."
 
@@ -201,6 +209,7 @@ class BaseParagraph:
 
     def __init__(self, document):
         self.document = document
+        self.document.paragraphs_count += 1
 
     def __iadd__(self, text):
         self.add(text)
@@ -302,3 +311,40 @@ class FootnoteItem:
     text: str
     canonical: str = None
     href: str = None
+
+
+class BaseList:
+
+    def __init__(self, document, ordered=False):
+        self.document = document
+        self.ordered = ordered
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+    
+    def new_item(self):
+        raise NotImplementedError
+
+
+class BaseListItem:
+    
+    def __init__(self, list):
+        self.list = list
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+    
+    def new_paragraph(self, text=None):
+        raise NotImplementedError
+
+    def p(self, text=None):
+        return self.new_paragraph(text=text)
+
+    # def new_list(self, ordered=False):
+    #     raise NotImplementedError

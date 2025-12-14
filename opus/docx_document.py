@@ -158,7 +158,6 @@ class Document(BaseDocument):
         if thematic_break:
             p = self.docx.add_paragraph(EMDASH * 20, style="Normal")
             p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
-        self.paragraphs_count += 1
         paragraph = Paragraph(self)
         if text:
             paragraph.add(text)
@@ -166,7 +165,6 @@ class Document(BaseDocument):
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
-        self.paragraphs_count += 1
         paragraph = Quote(self)
         if text:
             paragraph.add(text)
@@ -179,6 +177,9 @@ class Document(BaseDocument):
     def new_page(self):
         self.page_number += 1
         self.docx.add_page_break()
+
+    def new_list(self, ordered=False):
+        return List(self, ordered=ordered)
 
     def set_page_number(self, number):
         self.page_number = number
@@ -366,3 +367,63 @@ class Paragraph(BaseParagraph):
 class Quote(Paragraph):
 
     STYLESHEETNAME = "Quote"
+
+
+class List(BaseList):
+
+    def __init__(self, document, ordered=False, level=1):
+        super().__init__(document, ordered=ordered)
+        self.level = level
+
+    def new_item(self):
+        return ListItem(self)
+
+
+class ListItem(BaseListItem):
+
+    def __enter__(self):
+        self.first_paragraph = True
+        return self
+
+    def __exit__(self, *exc):
+        pass
+    
+    def new_paragraph(self, text=None):
+        if self.first_paragraph:
+            if self.list.ordered:
+                paragraph = OrderedListItemParagraph(self.list.document, self.list.level)
+            else:
+                paragraph = UnorderedListItemParagraph(self.list.document, self.list.level)
+            self.first_paragraph = False
+        else:
+            paragraph = ContinueListItemParagraph(self.list.document, self.list.level)
+        if text:
+            paragraph.add(text)
+        return paragraph
+
+    # def new_list(self, ordered=False):
+    #     return List(self.list.document, ordered=ordered, level=self.list.level+1)
+
+
+class ListItemParagraph(Paragraph):
+
+    def __init__(self, document, level):
+        if level > 1:
+            # Note: class level attribute is overridden by an instance level attribute.
+            self.STYLESHEETNAME = f"{self.STYLESHEETNAME} {level}"
+        super().__init__(document)
+
+
+class OrderedListItemParagraph(ListItemParagraph):
+
+    STYLESHEETNAME = "List Number"
+
+
+class UnorderedListItemParagraph(ListItemParagraph):
+
+    STYLESHEETNAME = "List Bullet"
+
+
+class ContinueListItemParagraph(ListItemParagraph):
+
+    STYLESHEETNAME = "List Continue"
