@@ -433,9 +433,9 @@ class Quote(Paragraph):
 
 class List(BaseList):
 
-    def __init__(self, document, ordered=False, parentlist=None):
+    def __init__(self, document, ordered=False, parent=None):
         super().__init__(document, ordered=ordered)
-        self.parentlist = parentlist
+        self.parent = parent
 
     def __enter__(self):
         self.flowables = []
@@ -446,10 +446,10 @@ class List(BaseList):
             style = self.document.stylesheet["OrderedList"]
         else:
             style = self.document.stylesheet["UnorderedList"]
-        if self.parentlist is None:
+        if self.parent is None:
             self.document.flowables.append(ListFlowable(self.flowables, style=style))
         else:
-            self.parentlist.flowables.append(ListFlowable(self.flowables, style=style))
+            self.parent.flowables.append(ListFlowable(self.flowables, style=style))
 
     def new_item(self):
         return ListItem(self)
@@ -480,10 +480,9 @@ class ListItem(BaseListItem):
             self.paragraph.add(text)
         return self.paragraph
 
-    # def new_list(self, ordered=False):
-    #     self.flush()
-    #     self.paragraph = List(self.list.document, ordered=ordered, parentlist=self.list)
-    #     return self.paragraph
+    def new_list(self, ordered=False):
+        self.flush()
+        return List(self.list.document, ordered=ordered, parent=self)
 
     def flush(self):
         "Flush out the current paragraph."

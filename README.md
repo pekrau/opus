@@ -47,6 +47,21 @@ def add(doc):
     p.add("And a sentence after the quote.")
 
     doc.new_page()
+    with doc.new_list(ordered=True) as l:
+        with l.new_item() as i:
+            i.p("First item in an ordered list.")
+        with l.new_item() as i:
+            i.p("Second item in an ordered list.")
+        with l.new_item() as i:
+            i.p("Third item.")
+            with i.new_list() as l2:
+                with l2.new_item() as i2:
+                    i2.p("First item in an unordered sublist")
+                with l2.new_item() as i2:
+                    i2.p("Second item in an unordered  sublist")
+        with l.new_item() as i:
+            i.p("Fourth item in an ordered list.")
+
     with doc.new_list(ordered=False) as l:
         with l.new_item() as i:
             i.p("First item in an unordered list.")
@@ -54,17 +69,6 @@ def add(doc):
             i.p("Second item in an unordered list.")
         with l.new_item() as i:
             i.p("Third item in an unordered list.")
-            i.p("Second paragraph in third item of unordered list.")
-        with l.new_item() as i:
-            i.p("Fourth item in an unordered list.")
-
-    with doc.new_list(ordered=True) as l:
-        with l.new_item() as i:
-            i.p("First item in an ordered list.")
-        with l.new_item() as i:
-            i.p("Second item in an ordered list.")
-        with l.new_item() as i:
-            i.p("Third item in an ordered list.")
 
     with doc.new_section("Title for top-level section"):
         p = doc.new_paragraph()

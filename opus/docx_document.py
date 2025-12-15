@@ -407,8 +407,8 @@ class ListItem(BaseListItem):
             paragraph.add(text)
         return paragraph
 
-    # def new_list(self, ordered=False):
-    #     return List(self.list.document, ordered=ordered, level=self.list.level+1)
+    def new_list(self, ordered=False):
+        return List(self.list.document, ordered=ordered, level=self.list.level + 1)
 
 
 class ListItemParagraph(Paragraph):

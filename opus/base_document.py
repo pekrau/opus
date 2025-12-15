@@ -1,6 +1,6 @@
 "Base document interface."
 
-VERSION = "0.5.10"
+VERSION = "0.6.0"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -353,5 +353,5 @@ class BaseListItem:
     def p(self, text=None):
         return self.new_paragraph(text=text)
 
-    # def new_list(self, ordered=False):
-    #     raise NotImplementedError
+    def new_list(self, ordered=False):
+        raise NotImplementedError
