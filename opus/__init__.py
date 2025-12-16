@@ -11,6 +11,8 @@ def get_document(format, **kwargs):
             from .docx_document import Document
         case "pdf":
             from .pdf_document import Document
+        case "epub":
+            from .epub_document import Document
         case _:
             raise NotImplementedError
     return Document(**kwargs)

@@ -37,50 +37,20 @@ class Document(BaseDocument):
         super().__init__(**kwargs)
 
         self.indexed = {}
-        self.page_number = 1
-
-        self.docx = self.get_docx()
         self.toc_table = None
-        p = None
-        if self.title:
-            p = self.docx.add_heading(self.title, 0)
-        if self.subtitle:
-            p = self.docx.add_heading(self.subtitle, 1)
-        if self.authors:
-            p = self.docx.add_heading(", ".join(self.authors), 2)
-        if self.version:
-            p = self.docx.add_paragraph(self.version)
-        if p:
-            p.paragraph_format.space_after = docx.shared.Pt(TITLE_PAGE_SPACER)
 
-    def initialize_toc(self):
-        if not self.toc_level:
-            return
-        if self.toc_table:
-            return
-        self.page_number += 1
-        self.docx.add_page_break()
-        self.docx.add_heading(self.toc_title, 1)
-        self.toc_table = self.docx.add_table(
-            rows=0, cols=0, style=self.docx.styles[TOC_STYLE]
-        )
-        self.toc_table.add_column(docx.shared.Mm(140))
-        self.toc_table.add_column(docx.shared.Mm(20))
-
-    def get_docx(self):
-        "Create, initialize and return a docx Document instance."
-        result = docx.Document()
+        self.docx = docx.Document()
 
         # Set the default document-wide language.
         # From https://stackoverflow.com/questions/36967416/how-can-i-set-the-language-in-text-with-python-docx
         if self.language:
-            styles_element = result.styles.element
+            styles_element = self.docx.styles.element
             rpr_default = styles_element.xpath("./w:docDefaults/w:rPrDefault/w:rPr")[0]
             lang_default = rpr_default.xpath("w:lang")[0]
             lang_default.set(docx.oxml.shared.qn("w:val"), self.language)
 
         # Set to A4 page size. The section here is an instance of the docx Section class.
-        section = result.sections[-1]
+        section = self.docx.sections[-1]
         section.page_height = docx.shared.Mm(297)
         section.page_width = docx.shared.Mm(210)
         section.left_margin = docx.shared.Mm(25.4)  # 1 inch
@@ -91,51 +61,75 @@ class Document(BaseDocument):
         section.footer_distance = docx.shared.Mm(12.7)
 
         # Modify styles.
-        style = result.styles["Title"]
+        style = self.docx.styles["Title"]
         style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
         for level in range(1, MAX_LEVEL + 1):
-            style = result.styles[f"Heading {level}"]
+            style = self.docx.styles[f"Heading {level}"]
             style.paragraph_format.space_before = docx.shared.Pt(HEADER_SPACE_BEFORE)
             style.paragraph_format.space_after = docx.shared.Pt(HEADER_SPACE_AFTER)
             style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
-        style = result.styles["Normal"]
+        style = self.docx.styles["Normal"]
         style.font.name = NORMAL_FONT
         style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
         style.paragraph_format.line_spacing = docx.shared.Pt(NORMAL_LINE_SPACING)
 
-        style = result.styles["Quote"]  # Quote blocks.
+        style = self.docx.styles["Quote"]  # Quote blocks.
         style.font.name = QUOTE_FONT
         style.font.size = docx.shared.Pt(QUOTE_FONT_SIZE)
         style.font.italic = False
         style.paragraph_format.left_indent = docx.shared.Pt(QUOTE_INDENT)
         style.paragraph_format.right_indent = docx.shared.Pt(QUOTE_INDENT)
 
-        style = result.styles["macro"]  # Code blocks.
+        style = self.docx.styles["macro"]  # Code blocks.
         style.font.name = CODE_FONT
         style.font.size = docx.shared.Pt(CODE_FONT_SIZE)
         style.paragraph_format.line_spacing = docx.shared.Pt(CODE_LINE_SPACING)
         style.paragraph_format.left_indent = docx.shared.Pt(CODE_INDENT)
 
-        style = result.styles.add_style(
+        style = self.docx.styles.add_style( # Hyperlink.
             "Hyperlink", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
         )
-        style.base_style = result.styles["Normal"]
+        style.base_style = self.docx.styles["Normal"]
         style.unhide_when_used = True
         style.font.color.rgb = docx.shared.RGBColor(*HYPERLINK_COLOR)
         style.font.underline = True
 
+        style = self.docx.styles.add_style(
+            "List Number Quote", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
+        )
+        style.base_style = self.docx.styles["List Number"]
+        style.font.name = QUOTE_FONT
+        style.font.size = docx.shared.Pt(QUOTE_FONT_SIZE)
+        style.unhide_when_used = True
+
+        style = self.docx.styles.add_style(
+            "List Bullet Quote", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
+        )
+        style.base_style = self.docx.styles["List Bullet"]
+        style.font.name = QUOTE_FONT
+        style.font.size = docx.shared.Pt(QUOTE_FONT_SIZE)
+        style.unhide_when_used = True
+
+        style = self.docx.styles.add_style(
+            "List Continue Quote", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
+        )
+        style.base_style = self.docx.styles["List Continue"]
+        style.font.name = QUOTE_FONT
+        style.font.size = docx.shared.Pt(QUOTE_FONT_SIZE)
+        style.unhide_when_used = True
+
         # Set Dublin core metadata.
         if self.authors:
-            result.core_properties.author = ", ".join(self.authors)
-        result.core_properties.created = datetime.datetime.now(tz=datetime.UTC)
+            self.docx.core_properties.author = ", ".join(self.authors)
+        self.docx.core_properties.created = datetime.datetime.now(tz=datetime.UTC)
         if self.language:
-            result.core_properties.language = self.language
+            self.docx.core_properties.language = self.language
 
         # Display page number in the header.
         # https://stackoverflow.com/questions/56658872/add-page-number-using-python-docx
-        paragraph = result.sections[-1].header.paragraphs[0]
+        paragraph = self.docx.sections[-1].header.paragraphs[0]
         paragraph.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
         run = paragraph.add_run()
         fldChar1 = docx.oxml.OxmlElement("w:fldChar")
@@ -149,7 +143,29 @@ class Document(BaseDocument):
         run._r.append(instrText)
         run._r.append(fldChar2)
 
-        return result
+        if self.title:
+            self.docx.add_heading(self.title, 0)
+        if self.subtitle:
+            self.docx.add_heading(self.subtitle, 1)
+        if self.authors:
+            self.docx.add_heading(", ".join(self.authors), 2)
+        if self.version:
+            self.docx.add_paragraph(self.version)
+        p = self.docx.add_paragraph(EMDASH * 35, style="Normal")
+        p.paragraph_format.space_after = docx.shared.Pt(TITLE_PAGE_SPACER)
+
+    def initialize_toc(self):
+        if not self.toc_level:
+            return
+        if self.toc_table:
+            return
+        self.docx.add_page_break()
+        self.docx.add_heading(self.toc_title, 1)
+        self.toc_table = self.docx.add_table(
+            rows=0, cols=0, style=self.docx.styles[TOC_STYLE]
+        )
+        self.toc_table.add_column(docx.shared.Mm(140))
+        self.toc_table.add_column(docx.shared.Mm(20))
 
     def new_paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
@@ -171,33 +187,17 @@ class Document(BaseDocument):
         return paragraph
 
     def new_section(self, title, subtitle=None):
-        "Add a new section, which is a context that increments the section level."
+        "Create a new quotation paragraph, add the text (if any) to it and return it."
         return Section(self, title, subtitle=subtitle)
 
     def new_page(self):
-        self.page_number += 1
         self.docx.add_page_break()
 
     def new_list(self, ordered=False):
         return List(self, ordered=ordered)
 
-    def set_page_number(self, number):
-        self.page_number = number
-
     def write(self, filepath):
-        self.output_final()
         self.docx.save(filepath)
-
-    def output_indexed(self):
-        if not self.indexed:
-            return
-        with self.no_numbers():
-            with self.new_section(self.index_title):
-                p = self.new_paragraph()
-                for canonical, page_numbers in self.indexed.items():
-                    numbers = ", ".join([str(n) for n in sorted(page_numbers)])
-                    p.add(f"{canonical},\t{numbers}")
-                    p.linebreak()
 
 
 class Section(BaseSection):
@@ -207,23 +207,36 @@ class Section(BaseSection):
         self.document.initialize_toc()
 
     def __enter__(self):
-        title, level = self.at_enter()
-        self.document.docx.add_heading(title, level=level)
+        super().__enter__()
+        self.document.docx.add_heading(self.title, level=self.level)
         if self.subtitle:
-            self.document.docx.add_heading(self.subtitle, level=level + 1)
-        if level <= self.document.toc_level:
+            self.document.docx.add_heading(self.subtitle, level=self.level + 1)
+        if self.level <= self.document.toc_level:
             cells = self.document.toc_table.add_row().cells
-            cells[0].text = title
+            cells[0].text = self.title
             cells[0].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
             cells[0].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
             cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
-                3 * (level - 1)
+                3 * (self.level - 1)
             )
-            cells[1].text = str(self.document.page_number)
-            cells[1].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
-            cells[1].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
-            cells[1].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
-        return self.document
+            self.page_number_cell = cell = cells[1]
+            cell.text = str(self.document.page["docx"])
+            cell.paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
+            cell.paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
+            cell.paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
+        return self
+
+    def set_page(self, **kwargs):
+        super().set_page(**kwargs)
+        try:
+            cell = self.page_number_cell
+        except AttributeError:
+            pass
+        else:
+            cell.text = str(self.document.page["docx"])
+            cell.paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
+            cell.paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
+            cell.paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
 
 
 class Paragraph(BaseParagraph):
@@ -279,9 +292,7 @@ class Paragraph(BaseParagraph):
         with self.underline():
             self.raw(text)
         self.line_started = True
-        self.document.indexed.setdefault(canonical or text, set()).add(
-            self.document.page_number
-        )
+        self.document.add_indexed(canonical or text, self.location)
 
     def link(self, href, text=None, raw=False):
         if not raw and self.line_started:
@@ -393,19 +404,28 @@ class ListItem(BaseListItem):
     def new_paragraph(self, text=None):
         if self.first_paragraph:
             if self.list.ordered:
-                paragraph = OrderedListItemParagraph(
-                    self.list.document, self.list.level
-                )
+                paragraph = OrderedListItemParagraph(self.list.document, self.list.level)
             else:
-                paragraph = UnorderedListItemParagraph(
-                    self.list.document, self.list.level
-                )
+                paragraph = UnorderedListItemParagraph(self.list.document, self.list.level)
             self.first_paragraph = False
         else:
             paragraph = ContinueListItemParagraph(self.list.document, self.list.level)
         if text:
             paragraph.add(text)
         return paragraph
+
+    def new_quote(self, text=None):
+        if self.first_paragraph:
+            if self.list.ordered:
+                quote = OrderedListItemQuote(self.list.document, self.list.level)
+            else:
+                quote = UnorderedListItemQuote(self.list.document, self.list.level)
+            self.first_quote = False
+        else:
+            quote = ContinueListItemQuote(self.list.document, self.list.level)
+        if text:
+            quote.add(text)
+        return quote
 
     def new_list(self, ordered=False):
         return List(self.list.document, ordered=ordered, level=self.list.level + 1)
@@ -433,3 +453,18 @@ class UnorderedListItemParagraph(ListItemParagraph):
 class ContinueListItemParagraph(ListItemParagraph):
 
     STYLESHEETNAME = "List Continue"
+
+
+class OrderedListItemQuote(ListItemParagraph):
+
+    STYLESHEETNAME = "List Number Quote"
+
+
+class UnorderedListItemQuote(ListItemParagraph):
+
+    STYLESHEETNAME = "List Bullet Quote"
+
+
+class ContinueListItemQuote(ListItemParagraph):
+
+    STYLESHEETNAME = "List Continue Quote"

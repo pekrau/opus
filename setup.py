@@ -14,6 +14,7 @@ setup(
     install_requires=[
         "python-docx",
         "reportlab",
+        "EbookLib",
         "pyyaml",
     ],
 )

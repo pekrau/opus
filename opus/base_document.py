@@ -1,25 +1,27 @@
 "Base document interface."
 
-VERSION = "0.6.0"
+import icecream
+
+icecream.install()
+
+VERSION = "0.7.0"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-import icecream
-
-icecream.install()
+from .references import DefaultReferenceFormatter
 
 
 class BaseDocument:
 
     def __init__(
         self,
+        identifier=None,
         title=None,
         subtitle=None,
         authors=None,
         version=None,
         language="sv-SE",
-        page_break_level=1,
         section_numbers=False,
         paragraph_numbers=False,
         toc_level=0,
@@ -27,15 +29,16 @@ class BaseDocument:
         index_title="Index",
         references=None,
         references_title="Referenser",
-        footnotes_level=0,
+        references_formatter=None,
         footnotes_title="Fotnoter",
+        title_page_title="Titelsida",
     ):
+        self.identifier = identifier
         self.title = title
         self.subtitle = subtitle
         self.authors = authors
         self.version = version
         self.language = language
-        self.page_break_level = page_break_level
         self.section_numbers = section_numbers
         self.paragraph_numbers = paragraph_numbers
         self.toc_level = toc_level
@@ -43,12 +46,13 @@ class BaseDocument:
         self.index_title = index_title
         self.references = references
         self.references_title = references_title
-        self.footnotes_level = footnotes_level
         self.footnotes_title = footnotes_title
+        self.title_page_title = title_page_title
 
         self.paragraphs_count = 0
         self.sections_counts = [0]
         self.footnotes = []
+        self.page = dict(pdf=1, docx=1, epub=1)
 
     def new_paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
@@ -57,10 +61,7 @@ class BaseDocument:
         raise NotImplementedError
 
     def p(self, text=None, thematic_break=False):
-        """Create a new paragraph, add the text (if any) to it and return it.
-        Optionally add a thematic break before it.
-        Syntactic sugar for 'new_paragraph'.
-        """
+        "Syntactic sugar for 'new_paragraph'."
         return self.new_paragraph(text=text, thematic_break=thematic_break)
 
     def new_quote(self, text=None):
@@ -68,7 +69,7 @@ class BaseDocument:
         raise NotImplementedError
 
     def new_section(self, title, subtitle=None):
-        "Add a new section, which is a context that increments the section level."
+        "Create a new section, which is a context that increments the section level."
         raise NotImplementedError
 
     @property
@@ -76,17 +77,25 @@ class BaseDocument:
         return len(self.sections_counts) - 1
 
     def new_page(self):
+        "New page, for formats that support this notion."
         raise NotImplementedError
+
+    def set_page(self, **pages):
+        for format, number in pages.items():
+            if format not in self.page:
+                raise ValueError(f"no such format '{format}' for set_page.")
+            if number is not None:
+                self.page[format] = number
 
     def new_list(self, ordered=False):
         raise NotImplementedError
 
-    def set_page_number(self, number):
-        raise NotImplementedError
-
-    def flush(self):
+    def paragraph_flush(self):
         "Flush out the current paragraph."
         pass
+
+    def add_indexed(self, canonical, location):
+        self.indexed.setdefault(canonical or text, set()).add(location)
 
     @contextmanager
     def no_numbers(self):
@@ -101,64 +110,80 @@ class BaseDocument:
             self.paragraph_numbers = self.old_paragraph_numbers
             self.section_numbers = self.old_section_numbers
 
-    def output_final(self):
-        "Output footnotes, references and index."
-        self.output_footnotes()
-        if self.references:
-            self.references.output(self)
-        self.output_indexed()
-
-    def output_footnotes(self):
+    def output_footnotes(self, title, **pages):
         "Output the footnotes to the document."
         if not self.footnotes:
             return
-        level = self.section_level
-        if level != self.footnotes_level:
-            return
-        self.flush()
+        self.paragraph_flush()
         with self.no_numbers():
-            if level == 0:
-                with self.new_section(self.footnotes_title):
-                    self.output_footnotes_list()
-            else:
-                p = self.new_paragraph()
-                with p.italic():
+            with self.new_section(self.title):
+                for footnote in self.footnotes:
+                    p = self.new_paragraph()
                     with p.bold():
-                        p += self.footnotes_title
-                self.output_footnotes_list()
-            self.flush()
+                        p += f"{footnote.number}."
+                    for item in footnote.items:
+                        match item.type:
+                            case "add":
+                                p.add(item.text)
+                            case "raw":
+                                p.raw(item.text)
+                            case "indexed":
+                                p.indexed(item.text, canonical=item.canonical)
+                            case "link":
+                                p.link(item.href, item.text)
+                            case "reference":
+                                p.reference(item.text)
+                self.footnotes = []
+                self.paragraph_flush()
 
-    def output_footnotes_list(self):
-        "Output the list of footnotes to the document."
-        for footnote in self.footnotes:
-            p = self.new_paragraph()
-            with p.bold():
-                p += f"{footnote.number}."
-            for item in footnote.items:
-                match item.type:
-                    case "add":
-                        p.add(item.text)
-                    case "raw":
-                        p.raw(item.text)
-                    case "indexed":
-                        p.indexed(item.text, canonical=item.canonical)
-                    case "link":
-                        p.link(item.href, item.text)
-                    case "reference":
-                        p.reference(item.text)
-        self.footnotes = []
+    def output_references(self, title, formatter=None, **pages):
+        if formatter is None:
+            formatter = self.references.formatter
+        self.set_page(**pages)
+        with self.no_numbers():
+            with self.new_section(title):
+                for item in self.references:
+                    formatter.add_full(self, item)
+            self.paragraph_flush()
 
-    def output_indexed(self):
-        raise NotImplementedError
+    def output_indexed(self, title, **pages):
+        if not self.indexed:
+            return
+        self.set_page(**pages)
+        with self.no_numbers():
+            with self.new_section(title):
+                p = self.new_paragraph()
+                items = sorted(self.indexed.items(), key=lambda i: i[0].casefold())
+                for canonical, locations in items:
+                    p.add(canonical)
+                    for location in sorted(locations):
+                        p.raw(f", {location}")
+                    p.linebreak()
+                self.paragraph_flush()
 
 
 class BaseSection:
 
     def __init__(self, document, title, subtitle=None):
         self.document = document
-        self.title = title
+        self._title = title
         self.subtitle = subtitle
         self.document.sections_counts[-1] += 1
+
+    def __enter__(self):
+        self.document.sections_counts.append(0)
+        if self.level <= 1:
+            self.document.new_page()
+
+    def __exit__(self, *exc):
+        self.document.sections_counts.pop()
+        return self
+
+    def __exit__(self, *exc):
+        self.document.sections_counts.pop()
+
+    def set_page(self, **pages):
+        self.document.set_page(**pages)
 
     def new_paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
@@ -167,44 +192,29 @@ class BaseSection:
         return self.document.new_paragraph(text=text, thematic_break=thematic_break)
 
     def p(self, text=None, thematic_break=False):
-        """Create a new paragraph, add the text (if any) to it and return it.
-        Optionally add a thematic break before it.
-        Syntactic sugar for 'new_paragraph'.
-        """
-        return self.p(text=text, thematic_break=thematic_break)
+        "Syntactic sugar for 'new_paragraph'."
+        return self.new_paragraph(text=text, thematic_break=thematic_break)
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         return self.document.new_quote(text=text)
 
     def new_list(self, ordered=False):
-        return self.document.new_list(self.document, ordered=ordered)
+        return self.document.new_list(ordered=ordered)
 
-    def number(self):
-        return ".".join([str(n) for n in self.document.sections_counts[:-1]]) + "."
+    @property
+    def level(self):
+        return self.document.section_level
 
-    def __enter__(self):
-        raise NotImplementedError
+    def number(self, delimiter="."):
+        return delimiter.join([str(n) for n in self.document.sections_counts[:-1]]) + delimiter
 
-    def __exit__(self, *exc):
-        self.document.sections_counts.pop()
-
-    def at_enter(self):
-        self.document.sections_counts.append(0)
-        level = self.document.section_level
-        if level <= self.document.page_break_level:
-            self.document.new_page()
+    @property
+    def title(self):
         if self.document.section_numbers:
-            title = [self.number()]
+            return f"{self.number()} {self._title}"
         else:
-            title = []
-        if self.title:
-            title.append(self.title)
-        return " ".join(title), level
-
-    def __exit__(self, *exc):
-        self.document.output_footnotes()
-        self.document.sections_counts.pop()
+            return self._title
 
 
 class BaseParagraph:
@@ -212,6 +222,7 @@ class BaseParagraph:
     def __init__(self, document):
         self.document = document
         self.document.paragraphs_count += 1
+        self.location = self.document.paragraphs_count
 
     def __iadd__(self, text):
         self.add(text)
@@ -255,6 +266,9 @@ class BaseParagraph:
                 self.raw(str(footnote.number))
         self.document.footnotes.append(footnote)
         return footnote
+
+    def set_page(self, **pages):
+        self.document.set_page(**pages)
 
     # @contextmanager
     def bold(self):
@@ -352,6 +366,9 @@ class BaseListItem:
 
     def p(self, text=None):
         return self.new_paragraph(text=text)
+
+    def new_quote(self, text=None):
+        raise NotImplementedError
 
     def new_list(self, ordered=False):
         raise NotImplementedError

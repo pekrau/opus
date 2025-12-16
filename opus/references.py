@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-MAX_AUTHORS = 2
+MAX_AUTHORS = 4
 
 
 class References:
@@ -12,7 +12,7 @@ class References:
 
     def __init__(self, dirpath, formatter=None):
         self.dirpath = Path(dirpath).expanduser().resolve()
-        self.formatter = formatter or DefaultReferenceFormatter()
+        self.formatter = DefaultReferenceFormatter()
         self.items = {}
         for filepath in self.dirpath.iterdir():
             if filepath.stem.startswith("template"):
@@ -29,6 +29,9 @@ class References:
 
     def reset_used(self):
         self.used = set()
+
+    def __iter__(self):
+        return (self[name] for name in sorted(self.used))
 
     def __len__(self):
         return len(self.items)
@@ -49,20 +52,9 @@ class References:
             self.used.add(name)
             self.formatter.add_short(paragraph, item, raw=raw)
 
-    def output(self, document, items=None):
-        "Output list of references; by default those that have been marked used."
-        if not self.used:
-            return
-        with document.no_numbers():
-            if items is None:
-                items = [self[name] for name in sorted(self.used)]
-            with document.new_section(document.references_title):
-                for item in items:
-                    self.formatter.add_full(document, item)
-            document.flush()
-
 
 class DefaultReferenceFormatter:
+    "Default reference formatter."
 
     def add_short(self, paragraph, item, raw=False):
         with paragraph.italic():
@@ -75,7 +67,7 @@ class DefaultReferenceFormatter:
         if len(authors) > MAX_AUTHORS:
             p.raw(",")
             with p.italic():
-                p.add("et al.")
+                p.add("et al")
         p.raw(".")
         p.add(item["year"])
         if published := item.get("edition_published"):
@@ -96,8 +88,10 @@ class DefaultReferenceFormatter:
                     p.add(item["journal"])
                 if volume := item.get("volume"):
                     p.raw(f", {volume}")
+                elif year := item.get("year"):
+                    p.raw(f", {year}")
                 if issue := item.get("issue"):
-                    p.raw(f"({issue})")
+                    p.raw(f" ({issue})")
                 if pages := item.get("pages"):
                     p.raw(f", {pages.replace('--', '-')}.")
             case "website":

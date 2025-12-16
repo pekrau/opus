@@ -46,6 +46,8 @@ QUOTE_INDENT = 28
 FOOTNOTE_INDENT = 10
 REFERENCE_SPACE_BEFORE = 7
 REFERENCE_INDENT = 10
+EMDASH = "\u2014"
+MAX_HEADING = 6
 
 
 class Document(BaseDocument):
@@ -54,8 +56,12 @@ class Document(BaseDocument):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self.paragraph = None
+        self.indexed = {}
+        self.flowables = []
+        self.toc = None
+
         self.stylesheet = getSampleStyleSheet()
-        # self.stylesheet.list()
 
         # These modifications will affect subsquent styles inheriting from Normal.
         self.stylesheet["Normal"].fontName = NORMAL_FONT
@@ -93,6 +99,13 @@ class Document(BaseDocument):
                 parent=self.stylesheet["Heading2"],
             )
         )
+        for level in range(1, MAX_HEADING+1):
+            self.stylesheet.add(
+                ParagraphStyle(
+                    name=f"SectionSubtitle{level}",
+                    parent=self.stylesheet[f"Heading{level}"],
+                )
+            )
         self.stylesheet.add(
             ParagraphStyle(
                 name="Contents",
@@ -141,12 +154,6 @@ class Document(BaseDocument):
         self.stylesheet["Normal"].spaceBefore = NORMAL_SPACE_BEFORE
         self.stylesheet["Normal"].spaceAfter = NORMAL_SPACE_AFTER
 
-        self.paragraph = None
-        self.index = SimpleIndex(style=self.stylesheet["Normal"], headers=False)
-        self.indexed = False
-        self.flowables = []
-        self.toc = None
-
         if self.title:
             self.flowables.append(
                 PdfParagraph(self.title, style=self.stylesheet["Title"])
@@ -163,6 +170,9 @@ class Document(BaseDocument):
             self.flowables.append(
                 PdfParagraph(self.version, style=self.stylesheet["Normal"])
             )
+        self.flowables.append(
+            HRFlowable(width="100%", color=reportlab.lib.colors.black, spaceAfter=10)
+        )
         self.flowables.append(Spacer(0, TITLE_PAGE_SPACER))
 
     def setup_toc(self):
@@ -170,7 +180,7 @@ class Document(BaseDocument):
             return
         if self.toc is not None:
             return
-        self.flush()
+        self.paragraph_flush()
         self.flowables.append(PageBreak())
         self.flowables.append(
             PdfParagraph(self.toc_title, style=self.stylesheet["Contents"])
@@ -196,7 +206,7 @@ class Document(BaseDocument):
         """Create a new paragraph, add the text (if any) to it and return it.
         Optionally add a thematic break before it.
         """
-        self.flush()
+        self.paragraph_flush()
         if thematic_break:
             self.flowables.append(
                 HRFlowable(width="60%", color=reportlab.lib.colors.black, spaceAfter=10)
@@ -208,7 +218,7 @@ class Document(BaseDocument):
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
-        self.flush()
+        self.paragraph_flush()
         self.paragraph = Quote(self)
         if text:
             self.paragraph.add(text)
@@ -217,29 +227,25 @@ class Document(BaseDocument):
     def new_section(self, title, subtitle=None):
         "Add a new section, which is a context that increments the section level."
         self.setup_toc()
-        self.flush()
+        self.paragraph_flush()
         return Section(self, title, subtitle=subtitle)
 
     def new_page(self):
-        self.flush()
+        self.paragraph_flush()
         self.flowables.append(NotAtTopPageBreak())
 
     def new_list(self, ordered=False):
-        self.flush()
+        self.paragraph_flush()
         return List(self, ordered=ordered)
 
-    def set_page_number(self, number):
-        "Not needed for PDF."
-        pass
-
-    def flush(self):
+    def paragraph_flush(self):
         "Flush out the current paragraph."
         if self.paragraph:
             self.paragraph.output()
             self.paragraph = None
 
     def write(self, filepath):
-        self.output_final()
+        self.paragraph_flush()
         output = io.BytesIO()
         kwargs = dict(
             title=self.title,
@@ -249,32 +255,10 @@ class Document(BaseDocument):
         )
         if self.toc_level:
             pdfdoc = TocDocTemplate(output, self.toc_level, **kwargs)
+            pdfdoc.multiBuild(self.flowables, onLaterPages=self.write_page_number)
         else:
             pdfdoc = SimpleDocTemplate(output, **kwargs)
-        if self.indexed:
-            with self.no_numbers():
-                self.new_page()
-                self.flowables.append(
-                    PdfParagraph(self.index_title, style=self.stylesheet["Heading1"])
-                )
-                self.flowables.append(self.index)
-            if self.toc_level:
-                pdfdoc.multiBuild(
-                    self.flowables,
-                    onLaterPages=self.write_page_number,
-                    canvasmaker=self.index.getCanvasMaker(),
-                )
-            else:
-                pdfdoc.build(
-                    self.flowables,
-                    onLaterPages=self.write_page_number,
-                    canvasmaker=self.index.getCanvasMaker(),
-                )
-        else:
-            if self.toc_level:
-                pdfdoc.multiBuild(self.flowables, onLaterPages=self.write_page_number)
-            else:
-                pdfdoc.build(self.flowables, onLaterPages=self.write_page_number)
+            pdfdoc.build(self.flowables, onLaterPages=self.write_page_number)
         with open(filepath, "wb") as outfile:
             outfile.write(output.getvalue())
 
@@ -285,10 +269,6 @@ class Document(BaseDocument):
         canvas.setFont(NORMAL_FONT, NORMAL_FONT_SIZE)
         canvas.drawString(width - 84, height - 56, str(pdfdoc.page))
         canvas.restoreState()
-
-    def output_indexed(self):
-        "This is done in 'write' using a reportlab feature."
-        pass
 
 
 class TocDocTemplate(SimpleDocTemplate):
@@ -314,17 +294,17 @@ class TocDocTemplate(SimpleDocTemplate):
 class Section(BaseSection):
 
     def __enter__(self):
-        title, level = self.at_enter()
+        super().__enter__()
         self.document.flowables.append(
-            PdfParagraph(title, style=self.document.stylesheet[f"Heading{level}"])
+            PdfParagraph(self.title, style=self.document.stylesheet[f"Heading{self.level}"])
         )
         if self.subtitle:
             self.document.flowables.append(
                 PdfParagraph(
-                    self.subtitle, style=self.document.stylesheet[f"Heading{level+1}"]
+                    self.subtitle, style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"]
                 )
             )
-        return self.document
+        return self
 
 
 class Paragraph(BaseParagraph):
@@ -333,7 +313,7 @@ class Paragraph(BaseParagraph):
 
     def __init__(self, document):
         super().__init__(document)
-        self.contents = []
+        self.buffer = []
 
     def add(self, text, raw=False):
         """Add the text to the paragraph.
@@ -343,87 +323,85 @@ class Paragraph(BaseParagraph):
         """
         assert isinstance(text, str)
         if not raw:
-            self.contents.append(" ")
-        self.contents.append(text)  # No cleanup needed; reportlab does that.
+            self.buffer.append(" ")
+        self.buffer.append(text)  # No cleanup needed; reportlab does that.
 
     def linebreak(self):
-        self.contents.append("<br/>")
+        self.buffer.append("<br/>")
 
     def emdash(self, raw=False):
         if not raw:
-            self.contents.append(" ")
-        self.contents.append("\u2014")
+            self.buffer.append(" ")
+        self.buffer.append(EMDASH)
 
     def indexed(self, text, canonical=None, raw=False):
         if not raw:
-            self.contents.append(" ")
-        if canonical:
-            canonical = canonical.replace(",", ",,")
+            self.buffer.append(" ")
         with self.underline():
-            self.contents.append(f'<index item="{canonical or text}">{text}</index>')
-        self.document.indexed = True
+            self.buffer.append(text)
+        self.document.add_indexed(canonical or text, self.location)
 
     def link(self, href, text=None, raw=False):
         if not raw:
-            self.contents.append(" ")
-        self.contents.append(
+            self.buffer.append(" ")
+        self.buffer.append(
             f'<link href="{href}" underline="true" color="blue">{text or href}</link>'
         )
 
     @contextmanager
     def bold(self):
-        self.contents.append("<b>")
+        self.buffer.append("<b>")
         try:
             yield self
         finally:
-            self.contents.append("</b>")
+            self.buffer.append("</b>")
 
     @contextmanager
     def italic(self):
-        self.contents.append("<i>")
+        self.buffer.append("<i>")
         try:
             yield self
         finally:
-            self.contents.append("</i>")
+            self.buffer.append("</i>")
 
     @contextmanager
     def underline(self):
-        self.contents.append("<u>")
+        self.buffer.append("<u>")
         try:
             yield self
         finally:
-            self.contents.append("</u>")
+            self.buffer.append("</u>")
 
     @contextmanager
     def subscript(self):
         try:
-            self.contents.append("<sub>")
+            self.buffer.append("<sub>")
             yield self
         finally:
-            self.contents.append("</sub>")
+            self.buffer.append("</sub>")
 
     @contextmanager
     def superscript(self):
         try:
-            self.contents.append("<super>")
+            self.buffer.append("<super>")
             yield self
         finally:
-            self.contents.append("</super>")
+            self.buffer.append("</super>")
 
     def output(self, flowables=None):
-        if not self.contents:
+        if not self.buffer:
             return
         if self.document.paragraph_numbers:
-            self.contents.insert(0, f"({self.document.paragraphs_count}) ")
+            self.buffer.insert(0, f"({self.document.paragraphs_count}) ")
         if flowables is None:
             flowables = self.document.flowables
         flowables.append(
             PdfParagraph(
-                "".join(self.contents),
+                "".join(self.buffer),
                 style=self.document.stylesheet[self.STYLESHEETNAME],
             )
         )
-        self.contents = []
+        self.buffer = []
 
 
 class Quote(Paragraph):
@@ -463,29 +441,29 @@ class ListItem(BaseListItem):
         return self
 
     def __exit__(self, *exc):
-        self.flush()
+        self.paragraph_flush()
         self.list.flowables.append(PdfListItem(self.flowables))
 
     def new_paragraph(self, text=None):
-        self.flush()
+        self.paragraph_flush()
         self.paragraph = Paragraph(self.list.document)
         if text:
             self.paragraph.add(text)
         return self.paragraph
 
     def new_quote(self, text=None):
-        self.flush()
+        self.paragraph_flush()
         self.paragraph = Quote(self.list.document)
         if text:
             self.paragraph.add(text)
         return self.paragraph
 
     def new_list(self, ordered=False):
-        self.flush()
+        self.paragraph_flush()
         return List(self.list.document, ordered=ordered, parent=self)
 
-    def flush(self):
-        "Flush out the current paragraph."
+    def paragraph_flush(self):
+        "Flush out the current paragraph of this list item."
         if self.paragraph:
             self.paragraph.output(flowables=self.flowables)
             self.paragraph = None
