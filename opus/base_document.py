@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.3"
+VERSION = "0.7.4"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ class BaseDocument:
         section_numbers=False,
         paragraph_numbers=False,
         toc_level=0,
-        toc_title="Innehåll",
+        toc_title="Contents",
         references=None,
     ):
         self.identifier = identifier

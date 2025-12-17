@@ -14,9 +14,11 @@ STYLESHEET = """
 body {
   color: black;
   background-color: white;
-  font-family: sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
-blockquote {font-family: serif; }
+blockquote {
+  font-family: "Times New Roman", serif;
+}
 """
 
 
@@ -125,9 +127,12 @@ class Document(BaseDocument):
             lang=self.language,
         )
         nav.add_item(self.stylesheet)
-        contents = ['<p><ul style="list-style-type: none;">']
+        contents = [
+            f'<h1>{self.toc_title}</h1>',
+            '<p>'
+        ]
         for ch in self.chapters[1:]:
-            contents.append(f'<li><a href="{ch.file_name}">{ch.title}</a></li>')
+            contents.append(f'<a href="{ch.file_name}">{ch.title}</a><br/>')
         contents.append("</ul></p>")
         nav.content = "\n".join(contents)
         self.chapters.insert(1, nav)

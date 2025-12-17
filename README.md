@@ -1,6 +1,6 @@
-# Opus
+# opus
 
-Text defined in Python for output to different formats.
+Text defined in Python for output to PDF, DOCX and EPUB.
 
 ```python
 "Test of opus, showing usage of current features."
