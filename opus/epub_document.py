@@ -78,11 +78,15 @@ class Document(BaseDocument):
         """
         self.paragraph_flush()
         if thematic_break:
-            self.buffer.append("<hr/>")
+            self.thematic_break()
         self.paragraph = Paragraph(self)
         if text:
             self.paragraph.add(text)
         return self.paragraph
+
+    def thematic_break(self):
+        self.paragraph_flush()
+        self.buffer.append('<hr style="margin-top: 40px;"/>')
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
@@ -159,11 +163,12 @@ class Section(BaseSection):
             )
         return self
 
-    def output_footnotes(self, title):
+    def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
         if not self.document.footnotes:
             return
         with self.document.no_numbers():
+            self.document.thematic_break()
             self.document.buffer.append(f"<h{self.level+1}>{title}</h{self.level+1}>")
             self.document.output_footnotes_list()
 

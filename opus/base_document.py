@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.2"
+VERSION = "0.7.3"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -211,6 +211,10 @@ class BaseSection:
     def new_list(self, ordered=False):
         return self.document.new_list(ordered=ordered)
 
+    def new_section(self, title, subtitle=None):
+        "Create a new subsection, which is a context that increments the section level."
+        return self.document.new_section(title, subtitle=subtitle)
+
     @property
     def level(self):
         return self.document.section_level
@@ -228,7 +232,7 @@ class BaseSection:
         else:
             return self._title
 
-    def output_footnotes(self, title):
+    def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
         raise NotImplementedError
 

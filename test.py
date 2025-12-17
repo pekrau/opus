@@ -40,9 +40,9 @@ def add(doc):
     p = doc.new_paragraph()
     p.add("A sentence after the quote.")
 
-    with doc.new_section("Title for top-level section") as section:
-        section.set_page(docx=3)
-        p = section.new_paragraph()
+    with doc.new_section("Title for top-level section") as section1:
+        section1.set_page(docx=3)
+        p = section1.new_paragraph()
         p.add("First sentence in the top-level section.")
         p.add("Here is another mention of")
         p.indexed("Sage", canonical="Sage, Mr")
@@ -50,21 +50,24 @@ def add(doc):
         p.add("And here is a reference to an import work:")
         p.reference("Darwin 1859")
         p.raw(".")
-        with doc.new_section("Second-level section"):
-            p = section.new_paragraph()
+        with section1.new_section("Second-level section") as section2:
+            p = section2.new_paragraph()
             p.add("First sentence in the second-level section.")
-            with doc.new_section("A third-level section") as section2:
-                p = section2.new_paragraph()
+            with section2.new_section("A third-level section") as section3:
+                p = section3.new_paragraph()
                 p.add("First sentence in the third-level section.")
-            with doc.new_section("Another third-level section") as section2:
-                p = section2.new_paragraph()
-                p.add("First sentence in the third-level section.")
-        with doc.new_section("Another second-level section") as section2:
+            with section2.new_section("Another third-level section") as section3:
+                p = section3.new_paragraph()
+                p.add("First sentence in the other third-level section.")
+        with section1.new_section("Another second-level section") as section2:
             p = section2.new_paragraph()
             p.add("First sentence in the second second-level section.")
-            with doc.new_section("A third-level section"):
-                p = section.new_paragraph()
+            f = p.new_footnote()
+            f += "This is a footnote."
+            with section2.new_section("A third-level section") as section3:
+                p = section3.new_paragraph()
                 p.add("First sentence in the third-level section.")
+        section1.output_footnotes()
 
     with doc.new_section("Title for a second top-level section") as section:
         section.set_page(docx=4)

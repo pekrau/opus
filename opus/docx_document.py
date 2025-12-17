@@ -187,12 +187,16 @@ class Document(BaseDocument):
         Optionally add a thematic break before it.
         """
         if thematic_break:
-            p = self.docx.add_paragraph(EMDASH * 20, style="Normal")
-            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            self.thematic_break()
         paragraph = Paragraph(self)
         if text:
             paragraph.add(text)
         return paragraph
+
+    def thematic_break(self):
+        p = self.docx.add_paragraph(EMDASH * 20, style="Normal")
+        p.paragraph_format.space_before = docx.shared.Mm(8)
+        p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
 
     def new_quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
@@ -246,11 +250,12 @@ class Section(BaseSection):
         else:
             paragraph.text = str(self.document.page["docx"])
 
-    def output_footnotes(self, title):
+    def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
         if not self.document.footnotes:
             return
         with self.document.no_numbers():
+            self.document.thematic_break()
             self.document.docx.add_heading(title, level=self.level + 1)
             self.document.output_footnotes_list()
 
