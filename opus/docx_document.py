@@ -87,14 +87,14 @@ class Document(BaseDocument):
         # style.paragraph_format.line_spacing = docx.shared.Pt(CODE_LINE_SPACING)
         # style.paragraph_format.left_indent = docx.shared.Pt(CODE_INDENT)
 
-        style = self.docx.styles["Body Text 2"] # TOC entry.
+        style = self.docx.styles["Body Text 2"]  # TOC entry.
         style.font.name = NORMAL_FONT
         style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
         style.paragraph_format.space_before = docx.shared.Mm(1)
         style.paragraph_format.space_after = docx.shared.Mm(1)
         style.paragraph_format.line_spacing = docx.shared.Mm(1)
 
-        style = self.docx.styles["Body Text 3"] # TOC page.
+        style = self.docx.styles["Body Text 3"]  # TOC page.
         style.font.name = NORMAL_FONT
         style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
         style.paragraph_format.space_before = docx.shared.Mm(1)
@@ -103,7 +103,7 @@ class Document(BaseDocument):
         style.paragraph_format.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
 
         # Add new styles.
-        style = self.docx.styles.add_style( # Hyperlink.
+        style = self.docx.styles.add_style(  # Hyperlink.
             "Hyperlink", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
         )
         style.base_style = self.docx.styles["Normal"]
@@ -232,7 +232,9 @@ class Section(BaseSection):
             cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
                 3 * (self.level - 1)
             )
-            self.page_number_paragraph = cells[1].add_paragraph(str(self.document.page["docx"]), style="Body Text 3")
+            self.page_number_paragraph = cells[1].add_paragraph(
+                str(self.document.page["docx"]), style="Body Text 3"
+            )
         return self
 
     def set_page(self, **kwargs):
@@ -249,7 +251,7 @@ class Section(BaseSection):
         if not self.document.footnotes:
             return
         with self.document.no_numbers():
-            self.document.docx.add_heading(title, level=self.level+1)
+            self.document.docx.add_heading(title, level=self.level + 1)
             self.document.output_footnotes_list()
 
 
@@ -418,9 +420,13 @@ class ListItem(BaseListItem):
     def new_paragraph(self, text=None):
         if self.first_paragraph:
             if self.list.ordered:
-                paragraph = OrderedListItemParagraph(self.list.document, self.list.level)
+                paragraph = OrderedListItemParagraph(
+                    self.list.document, self.list.level
+                )
             else:
-                paragraph = UnorderedListItemParagraph(self.list.document, self.list.level)
+                paragraph = UnorderedListItemParagraph(
+                    self.list.document, self.list.level
+                )
             self.first_paragraph = False
         else:
             paragraph = ContinueListItemParagraph(self.list.document, self.list.level)

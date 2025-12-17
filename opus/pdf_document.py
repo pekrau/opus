@@ -99,7 +99,7 @@ class Document(BaseDocument):
                 parent=self.stylesheet["Heading2"],
             )
         )
-        for level in range(1, MAX_HEADING+1):
+        for level in range(1, MAX_HEADING + 1):
             self.stylesheet.add(
                 ParagraphStyle(
                     name=f"SectionSubtitle{level}",
@@ -296,12 +296,15 @@ class Section(BaseSection):
     def __enter__(self):
         super().__enter__()
         self.document.flowables.append(
-            PdfParagraph(self.title, style=self.document.stylesheet[f"Heading{self.level}"])
+            PdfParagraph(
+                self.title, style=self.document.stylesheet[f"Heading{self.level}"]
+            )
         )
         if self.subtitle:
             self.document.flowables.append(
                 PdfParagraph(
-                    self.subtitle, style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"]
+                    self.subtitle,
+                    style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"],
                 )
             )
         return self
@@ -313,7 +316,8 @@ class Section(BaseSection):
         with self.document.no_numbers():
             self.document.flowables.append(
                 PdfParagraph(
-                    title, style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"]
+                    title,
+                    style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"],
                 )
             )
             self.document.output_footnotes_list()

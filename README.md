@@ -105,7 +105,6 @@ def add(doc):
             with l.new_item() as i:
                 i.p("Third item in an unordered list.")
 
-
     doc.output_references(docx=5)
     doc.output_indexed(docx=6)
 

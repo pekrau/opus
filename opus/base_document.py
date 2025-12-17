@@ -4,12 +4,14 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.1"
+VERSION = "0.7.2"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .references import DefaultReferenceFormatter
+
+EMDASH = "\u2014"
 
 
 class BaseDocument:
@@ -214,7 +216,10 @@ class BaseSection:
         return self.document.section_level
 
     def number(self, delimiter="."):
-        return delimiter.join([str(n) for n in self.document.sections_counts[:-1]]) + delimiter
+        return (
+            delimiter.join([str(n) for n in self.document.sections_counts[:-1]])
+            + delimiter
+        )
 
     @property
     def title(self):
@@ -329,6 +334,9 @@ class Footnote:
 
     def reference(self, name):
         self.items.append(FootnoteItem("reference", name))
+
+    def emdash(self):
+        self.items.append(FootnoteItem("add", EMDASH))
 
 
 @dataclass

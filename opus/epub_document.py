@@ -27,7 +27,7 @@ class Document(BaseDocument):
         super().__init__(**kwargs)
 
         self.buffer = []
-        self.chapters = []     # Title page and level 1 sections.
+        self.chapters = []  # Title page and level 1 sections.
         self.indexed = {}
         self.paragraph = None
 
@@ -36,7 +36,8 @@ class Document(BaseDocument):
             uid="stylesheet",
             file_name="style/stylesheet.css",
             media_type="text/css",
-            content=STYLESHEET)
+            content=STYLESHEET,
+        )
         self.book.add_item(self.stylesheet)
         if self.identifier:
             self.book.add_metadata("DC", "identifier", self.identifier)
@@ -153,7 +154,9 @@ class Section(BaseSection):
             self.document.chapters.append(chapter)
         self.document.buffer.append(f"<h{self.level}>{self.title}</h{self.level}>")
         if self.subtitle:
-            self.document.buffer.append(f"<h{self.level+1}>{self.subtitle}</h{self.level+1}>")
+            self.document.buffer.append(
+                f"<h{self.level+1}>{self.subtitle}</h{self.level+1}>"
+            )
         return self
 
     def output_footnotes(self, title):
@@ -253,7 +256,6 @@ class Paragraph(BaseParagraph):
         self.document.buffer.append("".join(self.contents))
         self.document.buffer.append(f"</{self.TAG}>")
         self.contents = []
-
 
 
 class Quote(Paragraph):
