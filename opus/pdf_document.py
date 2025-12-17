@@ -33,16 +33,16 @@ TITLE_FONT_SIZE = 24
 TITLE_LEADING = 30
 TITLE_SPACE_AFTER = 15
 TITLE_PAGE_SPACER = 50
-CODE_FONT = "Courier"
-CODE_FONT_SIZE = 11
-CODE_LEADING = 12
-CODE_INDENT = 10
 QUOTE_FONT = "Times-Roman"
 QUOTE_FONT_SIZE = 14
 QUOTE_LEADING = 16
 QUOTE_SPACE_BEFORE = 0
 QUOTE_SPACE_AFTER = 14
 QUOTE_INDENT = 28
+# CODE_FONT = "Courier"
+# CODE_FONT_SIZE = 11
+# CODE_LEADING = 12
+# CODE_INDENT = 10
 FOOTNOTE_INDENT = 10
 REFERENCE_SPACE_BEFORE = 7
 REFERENCE_INDENT = 10
@@ -73,10 +73,10 @@ class Document(BaseDocument):
         self.stylesheet["Title"].alignment = 0  # Left
         self.stylesheet["Title"].spaceAfter = TITLE_SPACE_AFTER
 
-        self.stylesheet["Code"].fontName = CODE_FONT
-        self.stylesheet["Code"].fontSize = CODE_FONT_SIZE
-        self.stylesheet["Code"].leading = CODE_LEADING
-        self.stylesheet["Code"].leftIndent = CODE_INDENT
+        # self.stylesheet["Code"].fontName = CODE_FONT
+        # self.stylesheet["Code"].fontSize = CODE_FONT_SIZE
+        # self.stylesheet["Code"].leading = CODE_LEADING
+        # self.stylesheet["Code"].leftIndent = CODE_INDENT
 
         self.stylesheet["OrderedList"].fontName = NORMAL_FONT
         self.stylesheet["OrderedList"].fontSize = NORMAL_FONT_SIZE
@@ -305,6 +305,18 @@ class Section(BaseSection):
                 )
             )
         return self
+
+    def output_footnotes(self, title):
+        "Output the footnotes to the section."
+        if not self.document.footnotes:
+            return
+        with self.document.no_numbers():
+            self.document.flowables.append(
+                PdfParagraph(
+                    title, style=self.document.stylesheet[f"SectionSubtitle{self.level+1}"]
+                )
+            )
+            self.document.output_footnotes_list()
 
 
 class Paragraph(BaseParagraph):

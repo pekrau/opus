@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -22,16 +22,12 @@ class BaseDocument:
         authors=None,
         version=None,
         language="sv-SE",
+        title_page_title="Title page",
         section_numbers=False,
         paragraph_numbers=False,
         toc_level=0,
         toc_title="Innehåll",
-        index_title="Index",
         references=None,
-        references_title="Referenser",
-        references_formatter=None,
-        footnotes_title="Fotnoter",
-        title_page_title="Titelsida",
     ):
         self.identifier = identifier
         self.title = title
@@ -39,15 +35,12 @@ class BaseDocument:
         self.authors = authors
         self.version = version
         self.language = language
+        self.title_page_title = title_page_title
         self.section_numbers = section_numbers
         self.paragraph_numbers = paragraph_numbers
         self.toc_level = toc_level
         self.toc_title = toc_title
-        self.index_title = index_title
         self.references = references
-        self.references_title = references_title
-        self.footnotes_title = footnotes_title
-        self.title_page_title = title_page_title
 
         self.paragraphs_count = 0
         self.sections_counts = [0]
@@ -87,6 +80,12 @@ class BaseDocument:
             if number is not None:
                 self.page[format] = number
 
+    def increment_page(self, format):
+        try:
+            self.page[format] += 1
+        except KeyError:
+            pass
+
     def new_list(self, ordered=False):
         raise NotImplementedError
 
@@ -110,35 +109,43 @@ class BaseDocument:
             self.paragraph_numbers = self.old_paragraph_numbers
             self.section_numbers = self.old_section_numbers
 
-    def output_footnotes(self, title, **pages):
+    def output_footnotes(self, title="Footnotes", **pages):
         "Output the footnotes to the document."
+        assert self.section_level == 0
         if not self.footnotes:
             return
         self.paragraph_flush()
         with self.no_numbers():
-            with self.new_section(self.title):
-                for footnote in self.footnotes:
-                    p = self.new_paragraph()
-                    with p.bold():
-                        p += f"{footnote.number}."
-                    for item in footnote.items:
-                        match item.type:
-                            case "add":
-                                p.add(item.text)
-                            case "raw":
-                                p.raw(item.text)
-                            case "indexed":
-                                p.indexed(item.text, canonical=item.canonical)
-                            case "link":
-                                p.link(item.href, item.text)
-                            case "reference":
-                                p.reference(item.text)
-                self.footnotes = []
-                self.paragraph_flush()
+            with self.new_section(title, **pages):
+                self.output_footnotes_list()
 
-    def output_references(self, title, formatter=None, **pages):
+    def output_footnotes_list(self):
+        for footnote in self.footnotes:
+            p = self.new_paragraph()
+            with p.bold():
+                p += f"{footnote.number}."
+            for item in footnote.items:
+                match item.type:
+                    case "add":
+                        p.add(item.text)
+                    case "raw":
+                        p.raw(item.text)
+                    case "indexed":
+                        p.indexed(item.text, canonical=item.canonical)
+                    case "link":
+                        p.link(item.href, item.text)
+                    case "reference":
+                        p.reference(item.text)
+        self.footnotes = []
+        self.paragraph_flush()
+
+    def output_references(self, title="References", formatter=None, **pages):
+        if self.references is None:
+            raise ValueError("No references instance provided.")
+        if not self.references.used:
+            return
         if formatter is None:
-            formatter = self.references.formatter
+            formatter = DefaultReferenceFormatter()
         self.set_page(**pages)
         with self.no_numbers():
             with self.new_section(title):
@@ -146,7 +153,7 @@ class BaseDocument:
                     formatter.add_full(self, item)
             self.paragraph_flush()
 
-    def output_indexed(self, title, **pages):
+    def output_indexed(self, title="Index", **pages):
         if not self.indexed:
             return
         self.set_page(**pages)
@@ -215,6 +222,10 @@ class BaseSection:
             return f"{self.number()} {self._title}"
         else:
             return self._title
+
+    def output_footnotes(self, title):
+        "Output the footnotes to the section."
+        raise NotImplementedError
 
 
 class BaseParagraph:

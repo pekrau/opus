@@ -14,17 +14,16 @@ __all__ = ["Document"]
 MAX_LEVEL = 6
 HEADER_SPACE_BEFORE = 14
 HEADER_SPACE_AFTER = 6
-TOC_STYLE = "Normal Table"
 NORMAL_FONT = "Helvetica"
 NORMAL_FONT_SIZE = 12
 NORMAL_LINE_SPACING = 18
 QUOTE_FONT = "Times New Roman"
 QUOTE_FONT_SIZE = 14
 QUOTE_INDENT = 24
-CODE_FONT = "Courier"
-CODE_FONT_SIZE = 11
-CODE_LINE_SPACING = 12
-CODE_INDENT = 10
+# CODE_FONT = "Courier"
+# CODE_FONT_SIZE = 11
+# CODE_LINE_SPACING = 12
+# CODE_INDENT = 10
 TITLE_PAGE_SPACER = 80
 HYPERLINK_COLOR = (0x05, 0x63, 0xC1)
 EMDASH = "\u2014"
@@ -82,12 +81,28 @@ class Document(BaseDocument):
         style.paragraph_format.left_indent = docx.shared.Pt(QUOTE_INDENT)
         style.paragraph_format.right_indent = docx.shared.Pt(QUOTE_INDENT)
 
-        style = self.docx.styles["macro"]  # Code blocks.
-        style.font.name = CODE_FONT
-        style.font.size = docx.shared.Pt(CODE_FONT_SIZE)
-        style.paragraph_format.line_spacing = docx.shared.Pt(CODE_LINE_SPACING)
-        style.paragraph_format.left_indent = docx.shared.Pt(CODE_INDENT)
+        # style = self.docx.styles["macro"]  # Code blocks.
+        # style.font.name = CODE_FONT
+        # style.font.size = docx.shared.Pt(CODE_FONT_SIZE)
+        # style.paragraph_format.line_spacing = docx.shared.Pt(CODE_LINE_SPACING)
+        # style.paragraph_format.left_indent = docx.shared.Pt(CODE_INDENT)
 
+        style = self.docx.styles["Body Text 2"] # TOC entry.
+        style.font.name = NORMAL_FONT
+        style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
+        style.paragraph_format.space_before = docx.shared.Mm(1)
+        style.paragraph_format.space_after = docx.shared.Mm(1)
+        style.paragraph_format.line_spacing = docx.shared.Mm(1)
+
+        style = self.docx.styles["Body Text 3"] # TOC page.
+        style.font.name = NORMAL_FONT
+        style.font.size = docx.shared.Pt(NORMAL_FONT_SIZE)
+        style.paragraph_format.space_before = docx.shared.Mm(1)
+        style.paragraph_format.space_after = docx.shared.Mm(1)
+        style.paragraph_format.line_spacing = docx.shared.Mm(1)
+        style.paragraph_format.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
+
+        # Add new styles.
         style = self.docx.styles.add_style( # Hyperlink.
             "Hyperlink", docx.enum.style.WD_STYLE_TYPE.CHARACTER, True
         )
@@ -162,7 +177,7 @@ class Document(BaseDocument):
         self.docx.add_page_break()
         self.docx.add_heading(self.toc_title, 1)
         self.toc_table = self.docx.add_table(
-            rows=0, cols=0, style=self.docx.styles[TOC_STYLE]
+            rows=0, cols=0, style=self.docx.styles["Normal Table"]
         )
         self.toc_table.add_column(docx.shared.Mm(140))
         self.toc_table.add_column(docx.shared.Mm(20))
@@ -213,30 +228,29 @@ class Section(BaseSection):
             self.document.docx.add_heading(self.subtitle, level=self.level + 1)
         if self.level <= self.document.toc_level:
             cells = self.document.toc_table.add_row().cells
-            cells[0].text = self.title
-            cells[0].paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
-            cells[0].paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
+            cells[0].add_paragraph(self.title, style="Body Text 2")
             cells[0].paragraphs[0].paragraph_format.left_indent = docx.shared.Mm(
                 3 * (self.level - 1)
             )
-            self.page_number_cell = cell = cells[1]
-            cell.text = str(self.document.page["docx"])
-            cell.paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
-            cell.paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
-            cell.paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
+            self.page_number_paragraph = cells[1].add_paragraph(str(self.document.page["docx"]), style="Body Text 3")
         return self
 
     def set_page(self, **kwargs):
         super().set_page(**kwargs)
         try:
-            cell = self.page_number_cell
+            paragraph = self.page_number_paragraph
         except AttributeError:
             pass
         else:
-            cell.text = str(self.document.page["docx"])
-            cell.paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.RIGHT
-            cell.paragraphs[0].paragraph_format.space_before = docx.shared.Mm(1)
-            cell.paragraphs[0].paragraph_format.space_after = docx.shared.Mm(1)
+            paragraph.text = str(self.document.page["docx"])
+
+    def output_footnotes(self, title):
+        "Output the footnotes to the section."
+        if not self.document.footnotes:
+            return
+        with self.document.no_numbers():
+            self.document.docx.add_heading(title, level=self.level+1)
+            self.document.output_footnotes_list()
 
 
 class Paragraph(BaseParagraph):

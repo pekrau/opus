@@ -156,6 +156,14 @@ class Section(BaseSection):
             self.document.buffer.append(f"<h{self.level+1}>{self.subtitle}</h{self.level+1}>")
         return self
 
+    def output_footnotes(self, title):
+        "Output the footnotes to the section."
+        if not self.document.footnotes:
+            return
+        with self.document.no_numbers():
+            self.document.buffer.append(f"<h{self.level+1}>{title}</h{self.level+1}>")
+            self.document.output_footnotes_list()
+
 
 class Paragraph(BaseParagraph):
 
