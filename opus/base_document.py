@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.4"
+VERSION = "0.7.5"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -95,8 +95,12 @@ class BaseDocument:
         "Flush out the current paragraph."
         pass
 
-    def add_indexed(self, canonical, location):
-        self.indexed.setdefault(canonical or text, set()).add(location)
+    @property
+    def location(self):
+        return self.paragraphs_count
+
+    def add_indexed(self, canonical):
+        self.indexed.setdefault(canonical or text, set()).add(self.location)
 
     @contextmanager
     def no_numbers(self):
@@ -166,9 +170,12 @@ class BaseDocument:
                 for canonical, locations in items:
                     p.add(canonical)
                     for location in sorted(locations):
-                        p.raw(f", {location}")
+                        self.output_indexed_location(p, location)
                     p.linebreak()
                 self.paragraph_flush()
+
+    def output_indexed_location(self, paragraph, location):
+        paragraph.raw(f", {location}")
 
 
 class BaseSection:
@@ -242,7 +249,6 @@ class BaseParagraph:
     def __init__(self, document):
         self.document = document
         self.document.paragraphs_count += 1
-        self.location = self.document.paragraphs_count
 
     def __iadd__(self, text):
         self.add(text)

@@ -32,6 +32,7 @@ class Document(BaseDocument):
         self.chapters = []  # Title page and level 1 sections.
         self.indexed = {}
         self.paragraph = None
+        self.filename = None
 
         self.book = epub.EpubBook()
         self.stylesheet = epub.EpubItem(
@@ -64,10 +65,11 @@ class Document(BaseDocument):
         if self.language:
             self.book.set_language(self.language)
         self.book.add_metadata("DC", "creator", f"opus {VERSION}")
+        self.filename = "title_page.xhtml"
         title_page = epub.EpubHtml(
             uid="title_page",
             title=self.title_page_title,
-            file_name="title_page.xhtml",
+            file_name=self.filename,
             lang=self.language,
         )
         title_page.add_item(self.stylesheet)
@@ -116,14 +118,23 @@ class Document(BaseDocument):
             self.paragraph.output()
             self.paragraph = None
 
+    @property
+    def location(self):
+        return (self.paragraphs_count, self.filename)
+
+    def output_indexed_location(self, paragraph, location):
+        number, filename = location
+        paragraph.raw(f', <a href="{filename}#{number}">{number}</a>')
+
     def write(self, filepath):
         self.paragraph_flush()
         if self.buffer:
             self.chapters[-1].content = "\n".join(self.buffer)
+        self.filename = "nav.xhtml"
         nav = epub.EpubHtml(
             uid="nav",
             title=self.toc_title,
-            file_name="nav.xhtml",
+            file_name=self.filename,
             lang=self.language,
         )
         nav.add_item(self.stylesheet)
@@ -154,9 +165,10 @@ class Section(BaseSection):
             if self.document.buffer:
                 self.document.chapters[-1].content = "\n".join(self.document.buffer)
                 self.document.buffer = []
+            self.document.filename = f"{self.number(delimiter='_')}section.xhtml"
             chapter = epub.EpubHtml(
                 title=self.title,
-                file_name=f"{self.number(delimiter='_')}_section.xhtml",
+                file_name=self.document.filename,
                 lang=self.document.language,
             )
             chapter.add_item(self.document.stylesheet)
@@ -210,7 +222,7 @@ class Paragraph(BaseParagraph):
             self.contents.append(" ")
         with self.underline():
             self.raw(text)
-        self.document.add_indexed(canonical or text, self.location)
+        self.document.add_indexed(canonical or text)
 
     def link(self, href, text=None, raw=False):
         if not raw:
@@ -260,7 +272,7 @@ class Paragraph(BaseParagraph):
     def output(self):
         if not self.contents:
             return
-        self.document.buffer.append(f"<{self.TAG}>")
+        self.document.buffer.append(f'<{self.TAG} id=f"{self.document.paragraphs_count}">')
         if self.document.paragraph_numbers:
             self.document.buffer.append(f"({self.document.paragraphs_count})")
         self.document.buffer.append("".join(self.contents))

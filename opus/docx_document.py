@@ -313,7 +313,7 @@ class Paragraph(BaseParagraph):
         with self.underline():
             self.raw(text)
         self.line_started = True
-        self.document.add_indexed(canonical or text, self.location)
+        self.document.add_indexed(canonical or text)
 
     def link(self, href, text=None, raw=False):
         if not raw and self.line_started:

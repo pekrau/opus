@@ -361,7 +361,7 @@ class Paragraph(BaseParagraph):
             self.buffer.append(" ")
         with self.underline():
             self.buffer.append(text)
-        self.document.add_indexed(canonical or text, self.location)
+        self.document.add_indexed(canonical or text)
 
     def link(self, href, text=None, raw=False):
         if not raw:
