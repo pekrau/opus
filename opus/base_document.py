@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.5"
+VERSION = "0.7.6"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -117,10 +117,10 @@ class BaseDocument:
 
     def output_footnotes(self, title="Footnotes", **pages):
         "Output the footnotes to the document."
+        self.paragraph_flush()
         assert self.section_level == 0
         if not self.footnotes:
             return
-        self.paragraph_flush()
         with self.no_numbers():
             with self.new_section(title, **pages):
                 self.output_footnotes_list()
@@ -142,10 +142,19 @@ class BaseDocument:
                         p.link(item.href, item.text)
                     case "reference":
                         p.reference(item.text)
+                    case "superscript":
+                        with p.superscript():
+                            p.add(item.text)
+                    case "subscript":
+                        with p.subscript():
+                            p.add(item.text)
+                    case _:
+                        raise NotImplementedError
         self.footnotes = []
         self.paragraph_flush()
 
     def output_references(self, title="References", formatter=None, **pages):
+        self.paragraph_flush()
         if self.references is None:
             raise ValueError("No references instance provided.")
         if not self.references.used:
@@ -160,6 +169,7 @@ class BaseDocument:
             self.paragraph_flush()
 
     def output_indexed(self, title="Index", **pages):
+        self.paragraph_flush()
         if not self.indexed:
             return
         self.set_page(**pages)
@@ -331,22 +341,37 @@ class Footnote:
     def add(self, text):
         assert isinstance(text, str)
         self.items.append(FootnoteItem("add", text))
+        return self
 
     def raw(self, text):
         assert isinstance(text, str)
         self.items.append(FootnoteItem("raw", text))
+        return self
 
     def indexed(self, text, canonical=None):
         self.items.append(Footnote("indexed", text, canonical=canonical))
+        return self
 
     def link(self, href, text=None):
         self.items.append(FootnoteItem("link", text=text or href, href=href))
+        return self
 
     def reference(self, name):
         self.items.append(FootnoteItem("reference", name))
+        return self
 
     def emdash(self):
         self.items.append(FootnoteItem("add", EMDASH))
+        return self
+
+    def superscript(self, text):
+        self.items.append(FootnoteItem("superscript", text))
+        return self
+
+    def subscript(self, text):
+        self.items.append(FootnoteItem("subscript", text))
+        return self
+
 
 
 @dataclass

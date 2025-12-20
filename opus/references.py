@@ -1,10 +1,18 @@
 "Reference database handler."
 
 from pathlib import Path
+import unicodedata
 
 import yaml
 
-MAX_AUTHORS = 4
+
+def to_stem(s):
+    """- Convert all non-ASCII characters to closest ASCII
+    - Lowercase
+    - Replace blank with dash
+    """
+    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("utf-8")
+    return s.lower().replace(" ", "-")
 
 
 class References:
@@ -20,11 +28,21 @@ class References:
             if filepath.suffix != ".yaml":
                 continue
             with open(filepath) as infile:
-                item = yaml.safe_load(infile)
-                name = item["name"].casefold()
-                if name in self.items:
-                    raise KeyError(f"reference name {name} already defined")
-                self.items[name] = item
+                try:
+                    item = yaml.safe_load(infile)
+                except yaml.parser.ParserError as error:
+                    raise ValueError(f"Invalid YAML in {filepath}")
+                else:
+                    try:
+                        name = item["name"]
+                    except KeyError:
+                        raise KeyError(f"missing 'name' in {filepath}")
+                    name = name.casefold()
+                    if to_stem(name) != filepath.stem:
+                        raise ValueError(f"name/filename mismatch for {filepath}")
+                    if name in self.items:
+                        raise KeyError(f"reference name {name} already defined")
+                    self.items[name] = item
         self.used = set()
 
     def reset_used(self):
@@ -48,6 +66,7 @@ class References:
             item = self[name]
         except KeyError:
             paragraph += f"[ref? {name}]"
+            print(f"Missing reference {name}")
         else:
             self.used.add(name)
             self.formatter.add_short(paragraph, item, raw=raw)
@@ -60,11 +79,11 @@ class DefaultReferenceFormatter:
         with paragraph.italic():
             paragraph.add(item["name"], raw=raw)
 
-    def add_full(self, document, item, raw=False):
+    def add_full(self, document, item, raw=False, max_authors=4):
         p = document.new_paragraph()
         authors = item.get("authors") or []
-        p.add(", ".join([self.format_name(a) for a in authors[:MAX_AUTHORS]]), raw=raw)
-        if len(authors) > MAX_AUTHORS:
+        p.add(", ".join([self.format_name(a) for a in authors[:max_authors]]), raw=raw)
+        if len(authors) > max_authors:
             p.raw(",")
             with p.italic():
                 p.add("et al")
@@ -111,5 +130,5 @@ class DefaultReferenceFormatter:
 
 
 if __name__ == "__main__":
-    refs = References("/home/pekrau/Dropbox/bok/referenser")
-    print(len(refs))
+    refs = References("~/references")
+    print(f"{len(refs)} references")

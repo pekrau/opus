@@ -42,6 +42,7 @@ class Document(BaseDocument):
             content=STYLESHEET,
         )
         self.book.add_item(self.stylesheet)
+        self.book.add_metadata("DC", "date", datetime.date.today().isoformat())
         if self.identifier:
             self.book.add_metadata("DC", "identifier", self.identifier)
         if self.title:
@@ -182,6 +183,7 @@ class Section(BaseSection):
 
     def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
+        self.document.paragraph_flush()
         if not self.document.footnotes:
             return
         with self.document.no_numbers():

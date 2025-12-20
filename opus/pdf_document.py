@@ -1,6 +1,5 @@
 "PDF document interface."
 
-import datetime
 import io
 
 import reportlab
@@ -316,6 +315,7 @@ class Section(BaseSection):
 
     def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
+        self.document.paragraph_flush()
         if not self.document.footnotes:
             return
         with self.document.no_numbers():
