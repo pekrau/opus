@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.8.0"
+VERSION = "0.8.1"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -292,6 +292,10 @@ class BaseParagraph:
         "Add an emdash character. Return the paragraph."
         raise NotImplementedError
 
+    def period(self):
+        "Add a period, with no blank prepended."
+        return self.raw(".")
+
     def indexed(self, text, canonical=None, raw=False):
         "Add an indexed term, optionally with its canonical term. Return the paragraph."
         raise NotImplementedError
@@ -414,6 +418,9 @@ class Footnote:
     def emdash(self):
         self.items.append(FootnoteItem("add", EMDASH))
         return self
+
+    def period(self):
+        return self.raw(".")
 
     def in_subscript(self, text):
         self.items.append(FootnoteItem("subscript", text))
