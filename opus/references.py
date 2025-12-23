@@ -80,7 +80,7 @@ class DefaultReferenceFormatter:
             paragraph.add(item["name"], raw=raw)
 
     def add_full(self, document, item, raw=False, max_authors=4):
-        p = document.new_paragraph()
+        p = document.paragraph()
         authors = item.get("authors") or []
         p.add(", ".join([self.format_name(a) for a in authors[:max_authors]]), raw=raw)
         if len(authors) > max_authors:
@@ -112,10 +112,10 @@ class DefaultReferenceFormatter:
                 if issue := item.get("issue"):
                     p.raw(f" ({issue})")
                 if pages := item.get("pages"):
-                    p.raw(f", {pages.replace('--', '-')}.")
-            case "website":
+                    p.add(f"{pages.replace('--', '-')}.")
+            case "link":
                 p.add(f"{item['title'].rstrip('.')}.")
-                p.add_link(item["url"])
+                p.link(item["url"])
                 if accessed := item.get("accessed"):
                     p.add(f"({accessed})")
 

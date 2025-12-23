@@ -182,7 +182,7 @@ class Document(BaseDocument):
         self.toc_table.add_column(docx.shared.Mm(140))
         self.toc_table.add_column(docx.shared.Mm(20))
 
-    def new_paragraph(self, text=None, thematic_break=False):
+    def paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
         Optionally add a thematic break before it.
         """
@@ -198,22 +198,25 @@ class Document(BaseDocument):
         p.paragraph_format.space_before = docx.shared.Mm(8)
         p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         paragraph = Quote(self)
         if text:
             paragraph.add(text)
         return paragraph
 
-    def new_section(self, title, subtitle=None):
-        "Create a new quotation paragraph, add the text (if any) to it and return it."
+    def section(self, title, subtitle=None):
+        "Create a new subsection, which is a context that increments the section level."
         return Section(self, title, subtitle=subtitle)
 
-    def new_page(self):
+    def pagebreak(self):
         self.docx.add_page_break()
 
-    def new_list(self, ordered=False):
-        return List(self, ordered=ordered)
+    def ordered_list(self):
+        return List(self, ordered=True)
+
+    def unordered_list(self):
+        return List(self, ordered=False)
 
     def write(self, filepath):
         self.docx.save(filepath)
@@ -278,9 +281,10 @@ class Paragraph(BaseParagraph):
 
     def add(self, text, raw=False):
         """Add the text to the paragraph.
-        - Exchanges newlines for blanks.
-        - Removes superfluous blanks.
-        - Prepends a blank, if 'raw' is False.
+        - Exchange newlines for blanks.
+        - Remove superfluous blanks.
+        - Prepend a blank, if 'raw' is False.
+        - Return the paragraph.
         """
         assert isinstance(text, str)
         lines = list(text.split())
@@ -288,34 +292,43 @@ class Paragraph(BaseParagraph):
             result = []
         else:
             result = [" "]
-        if not lines:
-            return
         for line in lines[:-1]:
             result.append(line)
             result.append(" ")
-        result.append(lines[-1])
+        try:
+            result.append(lines[-1])
+        except IndexError:
+            pass
         self.set_font_style(self.paragraph.add_run("".join(result)))
         self.line_started = True
+        return self
 
     def linebreak(self):
+        "Add a line break. Return the paragraph."
         self.paragraph.add_run("\n")
         self.line_started = False
+        return self
 
     def emdash(self, raw=False):
+        "Add an emdash character. Return the paragraph."
         if not raw and self.line_started:
             self.set_font_style(self.paragraph.add_run(" "))
         self.set_font_style(self.paragraph.add_run(EMDASH))
         self.line_started = True
+        return self
 
     def indexed(self, text, canonical=None, raw=False):
+        "Add an indexed term, optionally with its canonical term. Return the paragraph."
         if not raw and self.line_started:
             self.set_font_style(self.paragraph.add_run(" "))
         with self.underline():
             self.raw(text)
         self.line_started = True
         self.document.add_indexed(canonical or text)
+        return self
 
     def link(self, href, text=None, raw=False):
+        "Add a hyperlink, optionally with a text to display. Return the paragraph."
         if not raw and self.line_started:
             self.set_font_style(self.paragraph.add_run(" "))
 
@@ -344,6 +357,7 @@ class Paragraph(BaseParagraph):
 
         self.paragraph._p.append(hyperlink)
         self.line_started = True
+        return self
 
     @contextmanager
     def bold(self):
@@ -404,16 +418,18 @@ class Quote(Paragraph):
 
 
 class List(BaseList):
+    "List class; a context manager."
 
     def __init__(self, document, ordered=False, level=1):
         super().__init__(document, ordered=ordered)
         self.level = level
 
-    def new_item(self):
+    def item(self):
         return ListItem(self)
 
 
 class ListItem(BaseListItem):
+    "List item class; a context manager."
 
     def __enter__(self):
         self.first_paragraph = True
@@ -422,7 +438,7 @@ class ListItem(BaseListItem):
     def __exit__(self, *exc):
         pass
 
-    def new_paragraph(self, text=None):
+    def paragraph(self, text=None):
         if self.first_paragraph:
             if self.list.ordered:
                 paragraph = OrderedListItemParagraph(
@@ -439,7 +455,7 @@ class ListItem(BaseListItem):
             paragraph.add(text)
         return paragraph
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         if self.first_paragraph:
             if self.list.ordered:
                 quote = OrderedListItemQuote(self.list.document, self.list.level)
@@ -452,8 +468,11 @@ class ListItem(BaseListItem):
             quote.add(text)
         return quote
 
-    def new_list(self, ordered=False):
-        return List(self.list.document, ordered=ordered, level=self.list.level + 1)
+    def ordered_list(self):
+        return List(self.list.document, ordered=True, level=self.list.level + 1)
+
+    def unordered_list(self):
+        return List(self.list.document, ordered=False, level=self.list.level + 1)
 
 
 class ListItemParagraph(Paragraph):

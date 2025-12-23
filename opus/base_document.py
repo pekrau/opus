@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.7.6"
+VERSION = "0.8.0"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -49,21 +49,21 @@ class BaseDocument:
         self.footnotes = []
         self.page = dict(pdf=1, docx=1, epub=1)
 
-    def new_paragraph(self, text=None, thematic_break=False):
+    def paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
         Optionally add a thematic break before it.
         """
         raise NotImplementedError
 
     def p(self, text=None, thematic_break=False):
-        "Syntactic sugar for 'new_paragraph'."
-        return self.new_paragraph(text=text, thematic_break=thematic_break)
+        "Syntactic sugar for 'paragraph'."
+        return self.paragraph(text=text, thematic_break=thematic_break)
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
         raise NotImplementedError
 
-    def new_section(self, title, subtitle=None):
+    def section(self, title, subtitle=None):
         "Create a new section, which is a context that increments the section level."
         raise NotImplementedError
 
@@ -71,7 +71,7 @@ class BaseDocument:
     def section_level(self):
         return len(self.sections_counts) - 1
 
-    def new_page(self):
+    def pagebreak(self):
         "New page, for formats that support this notion."
         raise NotImplementedError
 
@@ -88,11 +88,14 @@ class BaseDocument:
         except KeyError:
             pass
 
-    def new_list(self, ordered=False):
+    def ordered_list(self):
         raise NotImplementedError
 
-    def paragraph_flush(self):
-        "Flush out the current paragraph."
+    def unordered_list(self):
+        raise NotImplementedError
+
+    def flush(self):
+        "Flush out any pending output."
         pass
 
     @property
@@ -117,17 +120,17 @@ class BaseDocument:
 
     def output_footnotes(self, title="Footnotes", **pages):
         "Output the footnotes to the document."
-        self.paragraph_flush()
+        self.flush()
         assert self.section_level == 0
         if not self.footnotes:
             return
         with self.no_numbers():
-            with self.new_section(title, **pages):
+            with self.section(title, **pages):
                 self.output_footnotes_list()
 
     def output_footnotes_list(self):
         for footnote in self.footnotes:
-            p = self.new_paragraph()
+            p = self.paragraph()
             with p.bold():
                 p += f"{footnote.number}."
             for item in footnote.items:
@@ -151,10 +154,10 @@ class BaseDocument:
                     case _:
                         raise NotImplementedError
         self.footnotes = []
-        self.paragraph_flush()
+        self.flush()
 
     def output_references(self, title="References", formatter=None, **pages):
-        self.paragraph_flush()
+        self.flush()
         if self.references is None:
             raise ValueError("No references instance provided.")
         if not self.references.used:
@@ -163,26 +166,26 @@ class BaseDocument:
             formatter = DefaultReferenceFormatter()
         self.set_page(**pages)
         with self.no_numbers():
-            with self.new_section(title):
+            with self.section(title):
                 for item in self.references:
                     formatter.add_full(self, item)
-            self.paragraph_flush()
+            self.flush()
 
     def output_indexed(self, title="Index", **pages):
-        self.paragraph_flush()
+        self.flush()
         if not self.indexed:
             return
         self.set_page(**pages)
         with self.no_numbers():
-            with self.new_section(title):
-                p = self.new_paragraph()
+            with self.section(title):
+                p = self.paragraph()
                 items = sorted(self.indexed.items(), key=lambda i: i[0].casefold())
                 for canonical, locations in items:
                     p.add(canonical)
                     for location in sorted(locations):
                         self.output_indexed_location(p, location)
                     p.linebreak()
-                self.paragraph_flush()
+                self.flush()
 
     def output_indexed_location(self, paragraph, location):
         paragraph.raw(f", {location}")
@@ -199,7 +202,7 @@ class BaseSection:
     def __enter__(self):
         self.document.sections_counts.append(0)
         if self.level <= 1:
-            self.document.new_page()
+            self.document.pagebreak()
 
     def __exit__(self, *exc):
         self.document.sections_counts.pop()
@@ -211,26 +214,29 @@ class BaseSection:
     def set_page(self, **pages):
         self.document.set_page(**pages)
 
-    def new_paragraph(self, text=None, thematic_break=False):
+    def paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
         Optionally add a thematic break before it.
         """
-        return self.document.new_paragraph(text=text, thematic_break=thematic_break)
+        return self.document.paragraph(text=text, thematic_break=thematic_break)
 
     def p(self, text=None, thematic_break=False):
-        "Syntactic sugar for 'new_paragraph'."
-        return self.new_paragraph(text=text, thematic_break=thematic_break)
+        "Syntactic sugar for 'paragraph'."
+        return self.paragraph(text=text, thematic_break=thematic_break)
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
-        return self.document.new_quote(text=text)
+        return self.document.quote(text=text)
 
-    def new_list(self, ordered=False):
-        return self.document.new_list(ordered=ordered)
+    def ordered_list(self):
+        return self.document.ordered_list()
 
-    def new_section(self, title, subtitle=None):
+    def unordered_list(self):
+        return self.document.unordered_list()
+
+    def section(self, title, subtitle=None):
         "Create a new subsection, which is a context that increments the section level."
-        return self.document.new_section(title, subtitle=subtitle)
+        return self.document.section(title, subtitle=subtitle)
 
     @property
     def level(self):
@@ -261,46 +267,57 @@ class BaseParagraph:
         self.document.paragraphs_count += 1
 
     def __iadd__(self, text):
-        self.add(text)
-        return self
+        return self.add(text)
 
     def add(self, text, raw=False):
         """Add the text to the paragraph.
-        - Exchanges newlines for blanks.
-        - Removes superfluous blanks.
-        - Prepends a blank, if 'raw' is False.
+        - Exchange newlines for blanks.
+        - Remove superfluous blanks.
+        - Prepend a blank, if 'raw' is False.
+        - Return the paragraph.
         """
         raise NotImplementedError
 
     def raw(self, text):
-        "Add the text without prepended blank to the paragraph."
-        self.add(text, raw=True)
+        """Add the text without prepended blank to the paragraph.
+        Return the paragraph.
+        """
+        return self.add(text, raw=True)
 
     def linebreak(self):
+        "Add a line break. Return the paragraph."
         raise NotImplementedError
 
     def emdash(self, raw=False):
+        "Add an emdash character. Return the paragraph."
         raise NotImplementedError
 
     def indexed(self, text, canonical=None, raw=False):
+        "Add an indexed term, optionally with its canonical term. Return the paragraph."
         raise NotImplementedError
 
     def link(self, href, text=None, raw=False):
+        "Add a hyperlink, optionally with a text to display. Return the paragraph."
         raise NotImplementedError
 
     def reference(self, name, raw=False):
+        "Add a reference. Return the paragraph."
         assert isinstance(name, str)
         if self.document.references:
             self.document.references.add(self, name, raw=raw)
         else:
             self.add(name, raw=raw)
+        return self
 
-    def new_footnote(self):
+    def footnote(self, text=None):
+        "Add a footnot and return it."
         footnote = Footnote(self, len(self.document.footnotes) + 1)
         with self.bold():
             with self.superscript():
                 self.raw(str(footnote.number))
         self.document.footnotes.append(footnote)
+        if text:
+            footnote.add(text)
         return footnote
 
     def set_page(self, **pages):
@@ -310,21 +327,56 @@ class BaseParagraph:
     def bold(self):
         raise NotImplementedError
 
+    def in_bold(self, text):
+        "Add the text in bold. Return the paragraph."
+        self.add(" ")
+        with self.bold():
+            self.add(text)
+        return self
+
     # @contextmanager
     def italic(self):
         raise NotImplementedError
+
+    def in_italic(self, text):
+        "Add the text in italic. Return the paragraph."
+        self.add(" ")
+        with self.italic():
+            self.raw(text)
+        return self
 
     # @contextmanager
     def underline(self):
         raise NotImplementedError
 
+    def in_underline(self, text):
+        "Add the text in underlined. Return the paragraph."
+        self.add(" ")
+        with self.underline():
+            self.raw(text)
+        return self
+
     # @contextmanager
     def subscript(self):
         raise NotImplementedError
 
+    def in_subscript(self, text):
+        "Add the text in subscript. Return the paragraph."
+        self.add(" ")
+        with self.subscript():
+            self.raw(text)
+        return self
+
     # @contextmanager
     def superscript(self):
         raise NotImplementedError
+
+    def in_superscript(self, text):
+        "Add the text in superscript. Return the paragraph."
+        self.add(" ")
+        with self.superscript():
+            self.raw(text)
+        return self
 
 
 class Footnote:
@@ -335,8 +387,7 @@ class Footnote:
         self.items = []
 
     def __iadd__(self, text):
-        self.add(text)
-        return self
+        return self.add(text)
 
     def add(self, text):
         assert isinstance(text, str)
@@ -364,14 +415,13 @@ class Footnote:
         self.items.append(FootnoteItem("add", EMDASH))
         return self
 
-    def superscript(self, text):
-        self.items.append(FootnoteItem("superscript", text))
-        return self
-
-    def subscript(self, text):
+    def in_subscript(self, text):
         self.items.append(FootnoteItem("subscript", text))
         return self
 
+    def in_superscript(self, text):
+        self.items.append(FootnoteItem("superscript", text))
+        return self
 
 
 @dataclass
@@ -384,6 +434,7 @@ class FootnoteItem:
 
 
 class BaseList:
+    "Base list class; a context manager."
 
     def __init__(self, document, ordered=False):
         self.document = document
@@ -395,16 +446,18 @@ class BaseList:
     def __exit__(self, *exc):
         pass
 
-    def new_item(self):
+    def item(self):
+        "Return a new item in the list, which is a context manager."
         raise NotImplementedError
 
     def add_items(self, *texts):
         for text in texts:
-            with self.new_item() as i:
+            with self.item() as i:
                 i.p(text)
 
 
 class BaseListItem:
+    "Base list item class; a context manager."
 
     def __init__(self, list):
         self.list = list
@@ -415,14 +468,18 @@ class BaseListItem:
     def __exit__(self, *exc):
         pass
 
-    def new_paragraph(self, text=None):
+    def paragraph(self, text=None):
         raise NotImplementedError
 
     def p(self, text=None):
-        return self.new_paragraph(text=text)
+        "Syntactic sugar for 'paragraph'."
+        return self.paragraph(text=text)
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         raise NotImplementedError
 
-    def new_list(self, ordered=False):
+    def ordered_list(self):
+        raise NotImplementedError
+
+    def unordered_list(self):
         raise NotImplementedError

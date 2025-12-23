@@ -56,7 +56,7 @@ class Document(BaseDocument):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.paragraph = None
+        self._paragraph = None
         self.indexed = {}
         self.flowables = []
         self.toc = None
@@ -180,7 +180,7 @@ class Document(BaseDocument):
             return
         if self.toc is not None:
             return
-        self.paragraph_flush()
+        self.flush()
         self.flowables.append(PageBreak())
         self.flowables.append(
             PdfParagraph(self.toc_title, style=self.stylesheet["Contents"])
@@ -202,54 +202,63 @@ class Document(BaseDocument):
         )
         self.flowables.append(self.toc)
 
-    def new_paragraph(self, text=None, thematic_break=False):
+    def paragraph(self, text=None, thematic_break=False):
         """Create a new paragraph, add the text (if any) to it and return it.
         Optionally add a thematic break before it.
         """
-        self.paragraph_flush()
+        self.flush()
         if thematic_break:
             self.thematic_break()
-        self.paragraph = Paragraph(self)
+        self._paragraph = Paragraph(self)
         if text:
-            self.paragraph.add(text)
-        return self.paragraph
+            self._paragraph.add(text)
+        return self._paragraph
 
     def thematic_break(self):
-        self.paragraph_flush()
+        self.flush()
         self.flowables.append(
-            HRFlowable(width="60%", color=reportlab.lib.colors.black, spaceAfter=20, spaceBefore=20)
+            HRFlowable(
+                width="60%",
+                color=reportlab.lib.colors.black,
+                spaceAfter=20,
+                spaceBefore=20,
+            )
         )
 
-    def new_quote(self, text=None):
+    def quote(self, text=None):
         "Create a new quotation paragraph, add the text (if any) to it and return it."
-        self.paragraph_flush()
-        self.paragraph = Quote(self)
+        self.flush()
+        self._paragraph = Quote(self)
         if text:
-            self.paragraph.add(text)
-        return self.paragraph
+            self._paragraph.add(text)
+        return self._paragraph
 
-    def new_section(self, title, subtitle=None):
+    def section(self, title, subtitle=None):
         "Add a new section, which is a context that increments the section level."
         self.setup_toc()
-        self.paragraph_flush()
+        self.flush()
         return Section(self, title, subtitle=subtitle)
 
-    def new_page(self):
-        self.paragraph_flush()
+    def pagebreak(self):
+        self.flush()
         self.flowables.append(NotAtTopPageBreak())
 
-    def new_list(self, ordered=False):
-        self.paragraph_flush()
-        return List(self, ordered=ordered)
+    def ordered_list(self):
+        self.flush()
+        return List(self, ordered=True)
 
-    def paragraph_flush(self):
-        "Flush out the current paragraph."
-        if self.paragraph:
-            self.paragraph.output()
-            self.paragraph = None
+    def unordered_list(self):
+        self.flush()
+        return List(self, ordered=False)
+
+    def flush(self):
+        "Flush out any pending output."
+        if self._paragraph:
+            self._paragraph.output()
+            self._paragraph = None
 
     def write(self, filepath):
-        self.paragraph_flush()
+        self.flush()
         output = io.BytesIO()
         kwargs = dict(
             title=self.title,
@@ -315,7 +324,7 @@ class Section(BaseSection):
 
     def output_footnotes(self, title="Footnotes"):
         "Output the footnotes to the section."
-        self.document.paragraph_flush()
+        self.document.flush()
         if not self.document.footnotes:
             return
         with self.document.no_numbers():
@@ -339,36 +348,46 @@ class Paragraph(BaseParagraph):
 
     def add(self, text, raw=False):
         """Add the text to the paragraph.
-        - Exchanges newlines for blanks.
-        - Removes superfluous blanks.
-        - Prepends a blank, if 'raw' is False.
+        - Exchange newlines for blanks.
+        - Remove superfluous blanks.
+        - Prepend a blank, if 'raw' is False.
+        - Return the paragraph.
         """
         assert isinstance(text, str)
         if not raw:
             self.buffer.append(" ")
         self.buffer.append(text)  # No cleanup needed; reportlab does that.
+        return self
 
     def linebreak(self):
+        "Add a line break. Return the paragraph."
         self.buffer.append("<br/>")
+        return self
 
     def emdash(self, raw=False):
+        "Add an emdash character. Return the paragraph."
         if not raw:
             self.buffer.append(" ")
         self.buffer.append(EMDASH)
+        return self
 
     def indexed(self, text, canonical=None, raw=False):
+        "Add an indexed term, optionally with its canonical term. Return the paragraph."
         if not raw:
             self.buffer.append(" ")
         with self.underline():
             self.buffer.append(text)
         self.document.add_indexed(canonical or text)
+        return self
 
     def link(self, href, text=None, raw=False):
+        "Add a hyperlink, optionally with a text to display. Return the paragraph."
         if not raw:
             self.buffer.append(" ")
         self.buffer.append(
             f'<link href="{href}" underline="true" color="blue">{text or href}</link>'
         )
+        return self
 
     @contextmanager
     def bold(self):
@@ -432,6 +451,7 @@ class Quote(Paragraph):
 
 
 class List(BaseList):
+    "List class; a context manager."
 
     def __init__(self, document, ordered=False, parent=None):
         super().__init__(document, ordered=ordered)
@@ -451,41 +471,46 @@ class List(BaseList):
         else:
             self.parent.flowables.append(ListFlowable(self.flowables, style=style))
 
-    def new_item(self):
+    def item(self):
         return ListItem(self)
 
 
 class ListItem(BaseListItem):
+    "List item class; a context manager."
 
     def __enter__(self):
         self.flowables = []
-        self.paragraph = None
+        self._paragraph = None
         return self
 
     def __exit__(self, *exc):
-        self.paragraph_flush()
+        self.flush()
         self.list.flowables.append(PdfListItem(self.flowables))
 
-    def new_paragraph(self, text=None):
-        self.paragraph_flush()
-        self.paragraph = Paragraph(self.list.document)
+    def paragraph(self, text=None):
+        self.flush()
+        self._paragraph = Paragraph(self.list.document)
         if text:
-            self.paragraph.add(text)
-        return self.paragraph
+            self._paragraph.add(text)
+        return self._paragraph
 
-    def new_quote(self, text=None):
-        self.paragraph_flush()
-        self.paragraph = Quote(self.list.document)
+    def quote(self, text=None):
+        self.flush()
+        self._paragraph = Quote(self.list.document)
         if text:
-            self.paragraph.add(text)
-        return self.paragraph
+            self._paragraph.add(text)
+        return self._paragraph
 
-    def new_list(self, ordered=False):
-        self.paragraph_flush()
-        return List(self.list.document, ordered=ordered, parent=self)
+    def ordered_list(self):
+        self.flush()
+        return List(self.list.document, ordered=True, parent=self)
 
-    def paragraph_flush(self):
-        "Flush out the current paragraph of this list item."
-        if self.paragraph:
-            self.paragraph.output(flowables=self.flowables)
-            self.paragraph = None
+    def unordered_list(self):
+        self.flush()
+        return List(self.list.document, ordered=False, parent=self)
+
+    def flush(self):
+        "Flush out any pending output for this list item."
+        if self._paragraph:
+            self._paragraph.output(flowables=self.flowables)
+            self._paragraph = None
