@@ -359,6 +359,15 @@ class Paragraph(BaseParagraph):
         self.line_started = True
         return self
 
+    def comment(self, text):
+        try:
+            author = self.document.authors[0]
+        except IndexError:
+            author = None
+        self.document.docx.add_comment(
+            runs=self.paragraph.runs, text=text, author=author
+        )
+
     @contextmanager
     def bold(self):
         try:

@@ -242,6 +242,9 @@ class Paragraph(BaseParagraph):
         self.contents.append(f'<a href="{href}">{text or href}</a>')
         return self
 
+    def comment(self, text):
+        pass
+
     @contextmanager
     def bold(self):
         self.contents.append("<b>")

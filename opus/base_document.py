@@ -4,7 +4,7 @@ import icecream
 
 icecream.install()
 
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -323,6 +323,9 @@ class BaseParagraph:
         if text:
             footnote.add(text)
         return footnote
+
+    def comment(self, text):
+        raise NotImplementedError
 
     def set_page(self, **pages):
         self.document.set_page(**pages)

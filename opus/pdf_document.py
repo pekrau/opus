@@ -389,6 +389,9 @@ class Paragraph(BaseParagraph):
         )
         return self
 
+    def comment(self, text):
+        pass
+
     @contextmanager
     def bold(self):
         self.buffer.append("<b>")

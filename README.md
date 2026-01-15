@@ -31,21 +31,17 @@ def add(doc):
     p = doc.p("First sentence in a new paragraph.")
     with p.italic():
         p.link("http://somewhere.com/", "Second link.")
+    p.comment("This is a comment.")  # Only DOCX.
 
-    q = (
-        doc.quote(
-            """This is a quote from a sage.
+    q = doc.quote(
+        """This is a quote from a sage.
         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
         do eiusmod tempor incididunt ut labore et dolore magna
         aliqua. Ut enim ad minim veniam, quis nostrud exercitation
         ullamco laboris nisi ut aliquip ex ea commodo consequat."""
-        )
-        .linebreak()
-        .linebreak()
     )
-    q.add("The name of the")
-    q.indexed("Mr Sage", canonical="Sage, Mr")
-    q.raw(".")
+    q.linebreak().linebreak()
+    q.add("The name of the").indexed("Mr Sage", canonical="Sage, Mr").period()
     p = doc.paragraph()
     p.add("A sentence after the quote.")
 
@@ -54,11 +50,9 @@ def add(doc):
         p = section1.paragraph()
         p.add("First sentence in the top-level section.")
         p.add("Here is another mention of")
-        p.indexed("Sage", canonical="Sage, Mr")
-        p.raw(".")
-        p.add("And here is a reference to an import work:")
-        p.reference("Darwin 1859")
-        p.raw(".")
+        p.indexed("Sage", canonical="Sage, Mr").period()
+        p.add("And here is a reference to an important book:")
+        p.reference("Darwin 1859").period()
         with section1.section("Second-level section") as section2:
             p = section2.paragraph()
             p.add("First sentence in the second-level section.")
@@ -85,8 +79,7 @@ def add(doc):
             This should appear on a new page."""
         )
         p.add("Here is yet another mention of")
-        p.indexed("Sage", canonical="Sage, Mr")
-        p.raw(".")
+        p.indexed("Sage", canonical="Sage, Mr").period()
 
         with section.ordered_list() as l:
             with l.item() as i:

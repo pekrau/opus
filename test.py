@@ -26,9 +26,10 @@ def add(doc):
     p = doc.p("First sentence in a new paragraph.")
     with p.italic():
         p.link("http://somewhere.com/", "Second link.")
+    p.comment("This is a comment.")  # Only DOCX.
 
     q = doc.quote(
-            """This is a quote from a sage.
+        """This is a quote from a sage.
         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
         do eiusmod tempor incididunt ut labore et dolore magna
         aliqua. Ut enim ad minim veniam, quis nostrud exercitation
