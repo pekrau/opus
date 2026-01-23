@@ -1,6 +1,6 @@
 "opus: Text defined in Python for output to PDF, DOCX and EPUB."
 
-from .base_document import VERSION as __version__
+from .constants import __version__
 from .references import References, DefaultReferenceFormatter
 
 

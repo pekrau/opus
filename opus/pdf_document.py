@@ -19,6 +19,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
 
+from .constants import __version__
 from .base_document import *
 
 
@@ -263,7 +264,7 @@ class Document(BaseDocument):
         kwargs = dict(
             title=self.title,
             author=", ".join(self.authors) or None,
-            creator=f"opus {VERSION}",
+            creator=f"opus {__version__}",
             lang=self.language,
         )
         if self.toc_level:

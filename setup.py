@@ -1,13 +1,11 @@
 from setuptools import setup
 
-import opus
+from opus.constants import __version__
 
 setup(
     name="opus",
-    packages=["opus-python"],
-    package_dir={"opus-python": "opus"},
-    version=opus.__version__,
-    description="Text defined in Python for output to different formats.",
+    version=__version__,
+    description="Text defined in Python for output to PDF, DOCX and EPUB.",
     author="Per Kraulis",
     author_email="per.kraulis@gmail.com",
     license="MIT",
@@ -15,6 +13,6 @@ setup(
         "python-docx",
         "reportlab",
         "EbookLib",
-        "pyyaml",
+        "PyYAML",
     ],
 )

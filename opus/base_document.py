@@ -1,17 +1,10 @@
 "Base document interface."
 
-import icecream
-
-icecream.install()
-
-VERSION = "0.8.2"
-
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .references import DefaultReferenceFormatter
-
-EMDASH = "\u2014"
+from .constants import EMDASH
 
 
 class BaseDocument:

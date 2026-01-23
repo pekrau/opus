@@ -4,12 +4,12 @@ import datetime
 
 from ebooklib import epub
 
+from .constants import __version__
 from .base_document import *
 
 __all__ = ["Document"]
 
 MAX_LEVEL = 6
-EMDASH = "\u2014"
 STYLESHEET = """
 body {
   color: black;
@@ -65,7 +65,7 @@ class Document(BaseDocument):
         self.buffer.append("<hr/>")
         if self.language:
             self.book.set_language(self.language)
-        self.book.add_metadata("DC", "creator", f"opus {VERSION}")
+        self.book.add_metadata("DC", "creator", f"opus {__version__}")
         self.filename = "title_page.xhtml"
         title_page = epub.EpubHtml(
             uid="title_page",
