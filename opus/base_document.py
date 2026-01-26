@@ -231,6 +231,11 @@ class BaseSection:
         "Create a new subsection, which is a context that increments the section level."
         return self.document.section(title, subtitle=subtitle)
 
+    def add_subsection(self, title, add_function):
+        "Create a new subsection and add content using 'add_function'."
+        with self.section(title, subtitle=add_function.__doc__) as section:
+            add_function(section)
+
     @property
     def level(self):
         return self.document.section_level
