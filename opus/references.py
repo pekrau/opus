@@ -6,13 +6,22 @@ import unicodedata
 import yaml
 
 
-def to_stem(s):
-    """- Convert all non-ASCII characters to closest ASCII
-    - Lowercase
-    - Replace blank with dash
+def normalize(reference):
+    """Normalize the reference for part of a URL.
+    - Normalize non-ASCII characters.
+    - Convert the string to ASCII.
+    - Lowercase.
+    - Replace blank with dash.
     """
-    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("utf-8")
-    return s.lower().replace(" ", "-")
+    return (
+        unicodedata.normalize("NFKD", reference)
+        .replace("æ", "a")
+        .replace("Æ", "A")
+        .encode("ASCII", "ignore")
+        .decode("utf-8")
+        .lower()
+        .replace(" ", "-")
+    )
 
 
 class References:
@@ -22,10 +31,8 @@ class References:
         self.dirpath = Path(dirpath).expanduser().resolve()
         self.formatter = DefaultReferenceFormatter()
         self.items = {}
-        for filepath in self.dirpath.iterdir():
+        for filepath in self.dirpath.glob("*.yaml"):
             if filepath.stem.startswith("template"):
-                continue
-            if filepath.suffix != ".yaml":
                 continue
             with open(filepath) as infile:
                 try:
@@ -34,50 +41,51 @@ class References:
                     raise ValueError(f"Invalid YAML in {filepath}")
                 else:
                     try:
-                        name = item["name"]
+                        reference = item["reference"]
                     except KeyError:
-                        raise KeyError(f"missing 'name' in {filepath}")
-                    name = name.casefold()
-                    if to_stem(name) != filepath.stem:
-                        raise ValueError(f"name/filename mismatch for {filepath}")
-                    if name in self.items:
-                        raise KeyError(f"reference name {name} already defined")
-                    self.items[name] = item
+                        raise KeyError(f"missing 'reference' in {filepath}")
+                    reference = reference.casefold()
+                    if normalize(reference) != filepath.stem:
+                        raise ValueError(f"reference/filename mismatch for {filepath}")
+                    if reference in self.items:
+                        raise KeyError(f"reference {reference} already defined")
+                    self.items[reference] = item
         self.used = set()
 
     def reset_used(self):
         self.used = set()
 
     def __iter__(self):
-        return (self[name] for name in sorted(self.used))
+        return (self[reference] for reference in sorted(self.used))
 
     def __len__(self):
         return len(self.items)
 
-    def __getitem__(self, name):
-        return self.items[name.casefold()]
+    def __getitem__(self, reference):
+        return self.items[reference.casefold()]
 
-    def __contains__(self, name):
-        return name.casefold() in self.items
+    def __contains__(self, reference):
+        return reference.casefold() in self.items
 
-    def add(self, paragraph, name, raw=False):
-        "Output the short form of the named reference, and mark as used."
+    def add(self, paragraph, reference, raw=False):
+        "Output the short form of the given reference, and mark as used."
         try:
-            item = self[name]
+            item = self[reference]
         except KeyError:
-            paragraph += f"[ref? {name}]"
-            print(f"Missing reference {name}")
+            paragraph += f"[ref? {reference}]"
+            print(f"Missing reference {reference}")
         else:
-            self.used.add(name)
+            self.used.add(reference)
             self.formatter.add_short(paragraph, item, raw=raw)
 
 
 class DefaultReferenceFormatter:
-    "Default reference formatter."
+    "Default reference formatter. Outputs the reference and the title."
 
     def add_short(self, paragraph, item, raw=False):
         with paragraph.italic():
-            paragraph.add(item["name"], raw=raw)
+            paragraph.add(item["reference"], raw=raw)
+        paragraph.add(f', "{item["title"]}"')
 
     def add_full(self, document, item, raw=False, max_authors=4):
         p = document.paragraph()
@@ -88,7 +96,7 @@ class DefaultReferenceFormatter:
             with p.italic():
                 p.add("et al")
         p.raw(".")
-        p.add(item["year"])
+        p.add(str(item["year"]))
         if published := item.get("edition_published"):
             p.add(f"[{published}]")
         p.raw(".")
@@ -115,7 +123,7 @@ class DefaultReferenceFormatter:
                     p.add(f"{pages.replace('--', '-')}.")
             case "link":
                 p.add(f"{item['title'].rstrip('.')}.")
-                p.link(item["url"])
+                p.link(item["href"])
                 if accessed := item.get("accessed"):
                     p.add(f"({accessed})")
 
@@ -130,5 +138,5 @@ class DefaultReferenceFormatter:
 
 
 if __name__ == "__main__":
-    refs = References("~/references")
+    refs = References("~/Dropbox/pekrau.github.io/references")
     print(f"{len(refs)} references")

@@ -22,7 +22,6 @@ from reportlab.platypus.tableofcontents import TableOfContents, SimpleIndex
 from .constants import __version__
 from .base_document import *
 
-
 __all__ = ["Document"]
 
 NORMAL_FONT = "Helvetica"

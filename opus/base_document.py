@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import importlib
 
 from .references import DefaultReferenceFormatter
 from .constants import EMDASH
@@ -17,7 +18,7 @@ class BaseDocument:
         authors=None,
         version=None,
         language="sv-SE",
-        title_page_title="Title page",
+        title_page_title="Titelsida",
         section_numbers=False,
         paragraph_numbers=False,
         toc_level=0,
@@ -182,6 +183,34 @@ class BaseDocument:
 
     def output_indexed_location(self, paragraph, location):
         paragraph.raw(f", {location}")
+
+    def build(
+        self,
+        chapters=None,
+        footnotes_title="Fotnoter",
+        footnotes_chapter=True,
+        references_title="Referenser",
+        indexed_title="Index",
+    ):
+        "Build the book document from the provided chapters."
+        for chapter in chapters:
+            if isinstance(chapter, str):
+                chapter = importlib.import_module(chapter)
+            try:
+                subtitle = chapter.subtitle
+            except AttributeError:
+                subtitle = None
+            with self.section(chapter.title, subtitle=subtitle) as section:
+                chapter.add(section)
+                if footnotes_title and footnotes_chapter:
+                    section.output_footnotes(footnotes_title)
+
+        if not footnotes_chapter and footnotes_title:
+            self.output_footnotes(footnotes_title)
+        if references_title:
+            self.output_references(references_title)
+        if indexed_title:
+            self.output_indexed(indexed_title)
 
 
 class BaseSection:
