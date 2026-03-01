@@ -195,13 +195,20 @@ class BaseDocument:
         "Build the book document from the provided chapters."
         for chapter in chapters:
             if isinstance(chapter, str):
+                title = chapter
                 chapter = importlib.import_module(chapter)
+                try:
+                    title = chapter.title
+                except AttributeError:
+                    pass
+            else:               # Required if already a module.
+                title = chapter.title
             try:
                 subtitle = chapter.subtitle
             except AttributeError:
                 subtitle = None
-            with self.section(chapter.title, subtitle=subtitle) as section:
-                chapter.add(section)
+            with self.section(title, subtitle=subtitle) as section:
+                chapter.build(section)
                 if footnotes_title and footnotes_chapter:
                     section.output_footnotes(footnotes_title)
 

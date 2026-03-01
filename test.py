@@ -1,6 +1,7 @@
 "Test of opus, showing usage of current features."
 
 import opus
+from opus.references import References
 
 
 def add(doc):
@@ -113,7 +114,7 @@ if __name__ == "__main__":
         paragraph_numbers=True,
         toc_level=2,
         toc_title="Contents",
-        references=opus.References("~/references"),
+        references=References("~/references"),
     )
 
     for format in ["docx", "pdf", "epub"]:

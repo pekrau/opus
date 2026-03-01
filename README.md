@@ -2,6 +2,11 @@
 
 Text defined in Python for output to PDF, DOCX and EPUB.
 
+To update package locally:
+```
+python setup.py sdist build
+```
+
 ```python
 "Test of opus, showing usage of current features."
 
