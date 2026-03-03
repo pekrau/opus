@@ -1,5 +1,6 @@
 "Base document interface."
 
+import datetime
 from contextlib import contextmanager
 from dataclasses import dataclass
 import importlib
@@ -16,7 +17,7 @@ class BaseDocument:
         title=None,
         subtitle=None,
         authors=None,
-        version=None,
+        version=f"Utkast {datetime.date.today()}",
         language="sv-SE",
         title_page_title="Titelsida",
         section_numbers=False,
