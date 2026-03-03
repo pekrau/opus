@@ -4,8 +4,9 @@ import datetime
 from contextlib import contextmanager
 from dataclasses import dataclass
 import importlib
+import pathlib
 
-from .references import DefaultReferenceFormatter
+from .references import References, DefaultReferenceFormatter
 from .constants import EMDASH
 
 
@@ -37,6 +38,8 @@ class BaseDocument:
         self.paragraph_numbers = paragraph_numbers
         self.toc_level = toc_level
         self.toc_title = toc_title
+        if isinstance(references, (str, pathlib.Path)):
+            references = References(references)
         self.references = references
 
         self.paragraphs_count = 0
