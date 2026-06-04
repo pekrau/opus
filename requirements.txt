@@ -4,7 +4,7 @@ colorama==0.4.6
 EbookLib==0.20
 executing==2.2.1
 icecream==2.1.8
-lxml==6.0.2
+lxml==6.1.0
 pillow==12.1.1
 Pygments==2.20.0
 python-docx==1.2.0
