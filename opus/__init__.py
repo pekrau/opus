@@ -1,6 +1,5 @@
 "opus: Text defined in Python for output to PDF, DOCX and EPUB."
 
-
 from .constants import __version__
 
 

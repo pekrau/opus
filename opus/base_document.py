@@ -199,17 +199,16 @@ class BaseDocument:
         "Build the book document from the provided chapters."
         for chapter in chapters:
             if isinstance(chapter, str):
-                title = chapter
                 chapter = importlib.import_module(chapter)
+            if chapter.__doc__:
+                lines = chapter.__doc__.split("\n")
+                title = lines[0].strip()
                 try:
-                    title = chapter.title
-                except AttributeError:
-                    pass
-            else:               # Required if already a module.
-                title = chapter.title
-            try:
-                subtitle = chapter.subtitle
-            except AttributeError:
+                    subtitle = lines[1].strip() or None
+                except IndexError:
+                    subtitle = None
+            else:
+                title = "No title"
                 subtitle = None
             with self.section(title, subtitle=subtitle) as section:
                 chapter.build(section)
@@ -271,9 +270,22 @@ class BaseSection:
         "Create a new subsection, which is a context that increments the section level."
         return self.document.section(title, subtitle=subtitle)
 
-    def add_subsection(self, title, add_function):
-        "Create a new subsection and add content using 'add_function'."
-        with self.section(title, subtitle=add_function.__doc__) as section:
+    def add_subsection(self, add_function):
+        """Create a new subsection and add content using 'add_function'.
+        The first line of the function's docstring is the title of the section,
+        and the second line is the subtitle, if any.
+        """
+        if add_function.__doc__:
+            lines = add_function.__doc__.split("\n")
+            title = lines[0].strip()
+            try:
+                subtitle = lines[1].strip() or None
+            except IndexError:
+                subtitle = None
+        else:
+            title = "No title"
+            subtitle = None
+        with self.section(title, subtitle=subtitle) as section:
             add_function(section)
 
     @property
@@ -498,10 +510,10 @@ class BaseList:
         "Return a new item in the list, which is a context manager."
         raise NotImplementedError
 
-    def add_items(self, *texts):
-        for text in texts:
-            with self.item() as i:
-                i.p(text)
+    def add(self, text):
+        "Add a text in a paragraph as an item in the list."
+        with self.item() as item:
+            item.p(text)
 
 
 class BaseListItem:
