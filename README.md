@@ -2,6 +2,10 @@
 
 Text defined in Python for output to PDF, DOCX and EPUB.
 
+**NOTE**: Work on this has been discontinued.
+See [mdcompile](https://github.com/pekrau/mdcompile) for a similar project
+based on a different design.
+
 To update package locally:
 ```
 python setup.py sdist build
